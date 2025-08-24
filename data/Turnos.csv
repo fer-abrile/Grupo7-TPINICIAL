@@ -1,0 +1,4 @@
+TurnoID,NombreTurno,HorarioInicio,HorarioFin
+1,Mañana,06:00,14:00
+2,Tarde,14:00,22:00
+3,Noche,22:00,06:00

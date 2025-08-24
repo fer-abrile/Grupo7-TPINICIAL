@@ -1,0 +1,11 @@
+ProductoID,NombreProducto,Categoria,UnidadMedida,PrecioUnitario
+1,Yerba Mate,Bebidas e Infusiones,kg,1500
+2,Café Molido,Bebidas e Infusiones,kg,2500
+3,Fideos Spaghetti,Pastas y Arroces,kg,400
+4,Arroz Largo Fino,Pastas y Arroces,kg,350
+5,Tomate Triturado,Conservas y Legumbres,kg,300
+6,Garbanzos,Conservas y Legumbres,kg,280
+7,Aceite de Girasol,Aceites y Vinagres,L,450
+8,Vinagre de Alcohol,Aceites y Vinagres,L,300
+9,Galletas Dulces,Galletas y Snacks,kg,500
+10,Mermelada de Durazno,Otros,kg,600
