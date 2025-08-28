@@ -2,7 +2,7 @@ import cv2
 import face_recognition
 import pickle
 import os
-from usuario import Usuario
+from core.usuario import Usuario
 
 class RegistroDatos:
     def __init__(self, archivo_usuarios="usuarios/usuarios.pkl"):
