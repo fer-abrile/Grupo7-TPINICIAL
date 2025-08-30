@@ -33,40 +33,67 @@ class LoginFacial:
         if not self.usuarios:
             QMessageBox.warning(self.parent, "Login", "No hay usuarios registrados.")
             return False
-    
+
         self.cap = cv2.VideoCapture(0)
         if not self.cap.isOpened():
             QMessageBox.warning(self.parent, "Login", "No se pudo acceder a la cámara.")
             return False
-    
+
         reconocido = False
         while True:
             ret, frame = self.cap.read()
             if not ret:
                 break
-    
+
+            # Reducir resolución para procesar más rápido
             small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
             rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-    
+
+            # Detección de caras
             face_locations = face_recognition.face_locations(rgb_small_frame)
-            face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
-    
-            for face_encoding in face_encodings:
-                matches = face_recognition.compare_faces(list(self.usuarios.values()), face_encoding)
+            for face_location in face_locations:
+                encodings = face_recognition.face_encodings(
+                    rgb_small_frame, known_face_locations=[face_location]
+                )[0:1]
+                if not encodings:
+                    continue
+
+                encoding = encodings[0]
+
+                # Comparar contra los usuarios registrados
+                matches = face_recognition.compare_faces(list(self.usuarios.values()), encoding)
                 nombres = list(self.usuarios.keys())
+                print("resultado",matches,nombres)
+
+                # Escalar coordenadas a la imagen original
+                top, right, bottom, left = face_location
+                top *= 4
+                right *= 4
+                bottom *= 4
+                left *= 4
+
                 if True in matches:
                     index = matches.index(True)
                     nombre_detectado = nombres[index]
                     if nombre_detectado == username:
+                        text = nombre_detectado
+                        color = (125,220,0)
                         reconocido = True
                         self._registrar_log(nombre_detectado)
-                        break
-    
+                    else:
+                        text = "Desconocido"
+                        color = (50, 50, 255)
+
+                cv2.rectangle(frame, (left, bottom), (right, bottom +30), color, -1)        
+                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                cv2.putText(frame, text, (left, bottom + 20), 2, 0.7, (255, 255, 255), 1)
+                break
+
             cv2.imshow("Reconocimiento Facial", frame)
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q') or reconocido:
                 break
-    
+        
         self.cap.release()
         cv2.destroyAllWindows()
         return reconocido
