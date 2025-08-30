@@ -3,11 +3,13 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QDate
 from datetime import datetime
 from modern_components import ModernLineEdit, ModernButton
+from core.registro_datos import RegistroDatos
 
 class RegisterDialog(QDialog):
     def __init__(self, parent, firebase_manager):
         super().__init__(parent)
         self.firebase_manager = firebase_manager
+        self.registro_facial = RegistroDatos()
         self.setWindowTitle("Registro de Empleado")
         self.setFixedSize(500, 600)
         self.setModal(True)
@@ -219,8 +221,14 @@ class RegisterDialog(QDialog):
         
         # Guardar en Firestore
         if self.firebase_manager.db and self.firebase_manager.registrar_usuario(datos_usuario):
-            QMessageBox.information(self, "Éxito", 
-                f"Empleado registrado exitosamente.\nEmpleadoID: {empleado_id}\nUsername: {username}")
-            self.accept()
+            # REGISTRO FACIAL
+            nombre = self.nombre_edit.text().strip()
+            resultado = self.registro_facial.registrar_usuario(username)
+            if resultado:
+                QMessageBox.information(self, "Éxito", 
+                    f"Empleado registrado exitosamente y rostro guardado.\nEmpleadoID: {empleado_id}\nUsername: {username}")
+                self.accept()
+            else:
+                QMessageBox.critical(self, "Error", "Error al registrar el rostro")
         else:
             QMessageBox.critical(self, "Error", "Error al registrar el empleado")

@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from firebase_manager import FirebaseManager
 from modern_components import ModernLineEdit, ModernButton, AnimatedCard
 from register_dialog import RegisterDialog
+from core.login_facial import LoginFacial
 
 class LoginWindow(QMainWindow):
     login_successful = pyqtSignal(dict)
@@ -11,6 +12,7 @@ class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.firebase_manager = FirebaseManager()
+        self.login_facial = LoginFacial(parent=self)  # Instancia para login facial
         self.setup_ui()
         self.setup_window()
         
@@ -144,42 +146,46 @@ class LoginWindow(QMainWindow):
     def login(self):
         username = self.username_edit.text().strip().lower()
         password = self.password_edit.text().strip()
-        
+
         if not username or not password:
             self.show_message("Por favor complete todos los campos")
             return
-        
+
         if not self.firebase_manager.db:
             self.show_message("Error de conexión con la base de datos")
             return
-        
+
         # Deshabilitar botón durante la validación
         self.login_button.setEnabled(False)
         self.login_button.setText("Validando...")
-        
-        # Buscar usuario en Firestore
+
         usuario = self.firebase_manager.buscar_usuario(username)
-        
-        if usuario:
-            # Validar contraseña (usando username como contraseña por simplicidad)
-            if password == usuario.get('password', ''):
-                self.show_message(f"¡Bienvenido {usuario['Nombre']} {usuario['Apellido']}!", "#27ae60")
+
+        if usuario and password == usuario.get('password', ''):
+            # RECONOCIMIENTO FACIAL OBLIGATORIO
+            resultado = self.login_facial.iniciar_login(username)
+            if resultado:
+                # Solo abre la ventana principal, no muestra mensaje de bienvenida
                 self.login_successful.emit(usuario)
-                # Aquí puedes abrir la ventana principal
                 QTimer.singleShot(1500, self.close)
             else:
-                self.show_message("Contraseña incorrecta")
+                self.show_message("Rostro no reconocido. Acceso denegado.")
+        elif usuario:
+            self.show_message("Contraseña incorrecta")
         else:
-            reply = QMessageBox.question(self, "Usuario no encontrado", 
-                                       "El usuario no existe. ¿Desea registrarse?",
-                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            reply = QMessageBox.question(
+                self,
+                "Usuario no encontrado",
+                "El usuario no existe. ¿Desea registrarse?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
             if reply == QMessageBox.StandardButton.Yes:
                 self.show_register()
-        
+
         # Rehabilitar botón
         self.login_button.setEnabled(True)
         self.login_button.setText("Iniciar Sesión")
-    
+
     def show_register(self):
         dialog = RegisterDialog(self, self.firebase_manager)
         if dialog.exec():
