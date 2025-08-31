@@ -1,4 +1,4 @@
-#!/home/fer/UNGS/TEST2/venv/bin/python3
+#!/home/fer/UNGS/TEST2/venv/bin/python
 # -*- coding: utf-8 -*-
 # Copyright 2025 Google LLC
 #

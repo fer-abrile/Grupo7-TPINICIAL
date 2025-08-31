@@ -1,4 +1,5 @@
 import sys
+import json
 from PyQt6.QtWidgets import QApplication
 from login_window import LoginWindow
 
@@ -23,3 +24,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def save_state(self):
+        with open(self.config['state_file'], 'w') as f:
+            json.dump(self.state, f)
