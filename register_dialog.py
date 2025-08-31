@@ -59,7 +59,7 @@ class CameraPopup(QDialog):
             face_locations = face_recognition.face_locations(rgb_frame)
             if len(face_locations) == 1:
                 face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-                self.face_embedding = face_encodings[0].tolist()
+                self.face_embedding = [round(float(x), 5) for x in face_encodings[0]]
                 QMessageBox.information(self, "Éxito", "Rostro capturado correctamente.")
                 self.accept()
             elif len(face_locations) == 0:
@@ -265,7 +265,7 @@ class RegisterDialog(QDialog):
 
         if self.face_embedding is None:
             QMessageBox.warning(self, "Error", "Debe capturar el rostro antes de guardar.")
-            return
+            return 
         
         username = self.generar_username(
             self.nombre_edit.text().strip(),

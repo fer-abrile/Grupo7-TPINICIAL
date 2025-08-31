@@ -11,7 +11,7 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # 3️⃣ Crear un documento de prueba
-doc_ref = db.collection("test").document("prueba")
+doc_ref = db.collection("eventos").document("prueba")
 doc_ref.set({"mensaje": "¡Conexión exitosa!"})
 
 # 4️⃣ Leer el documento
