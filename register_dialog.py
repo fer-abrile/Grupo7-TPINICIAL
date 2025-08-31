@@ -289,7 +289,7 @@ class RegisterDialog(QDialog):
             'password':'12345',
             'face_embedding': self.face_embedding
         }
-        
+        print(datos_usuario)
         if self.firebase_manager.db and self.firebase_manager.registrar_usuario(datos_usuario):
             QMessageBox.information(self, "Éxito", 
                 f"Empleado registrado exitosamente.\nEmpleadoID: {empleado_id}\nUsername: {username}")
