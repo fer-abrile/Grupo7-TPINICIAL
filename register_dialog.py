@@ -216,7 +216,7 @@ class CameraPopup(QDialog):
                 cv2.rectangle(frame, (left, top), (right, bottom), color, 3)
                 cv2.rectangle(frame, (left, bottom - 35), (right, bottom), color, cv2.FILLED)
                 cv2.putText(frame, text, (left + 6, bottom - 6), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
                 
                 self.status_label.setText(f"¡Verificación exitosa! ({confidence:.1f}%)")
                 self.status_label.setStyleSheet("""
@@ -225,7 +225,8 @@ class CameraPopup(QDialog):
                         color: #27ae60;
                         padding: 8px;
                         font-weight: 600;
-                    }""")
+                    }
+                """)
 
 
     def capture_face(self):
@@ -245,7 +246,7 @@ class CameraPopup(QDialog):
                     top, right, bottom, left = face_locations[0]
                     cv2.rectangle(self.current_frame, (left, top), (right, bottom), (0, 255, 0), 3)
                     cv2.putText(self.current_frame, "CAPTURADO", (left, top - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                     
                     QMessageBox.information(self, "Éxito", "Rostro capturado correctamente.")
                     self.accept()
@@ -270,7 +271,7 @@ class RegisterDialog(QDialog):
         super().__init__(parent)
         self.firebase_manager = firebase_manager
         self.setWindowTitle("Registro de Empleado")
-        self.setFixedSize(500, 600)
+        self.setFixedSize(650, 650)  # Más ancho y alto
         self.setModal(True)
         self.face_embedding = None
         
@@ -280,7 +281,7 @@ class RegisterDialog(QDialog):
     def setup_ui(self):
         layout = QVBoxLayout()
         layout.setSpacing(20)
-        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setContentsMargins(40, 30, 40, 30)  # Más margen horizontal
         
         title = QLabel("Registro de Empleado")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -295,60 +296,110 @@ class RegisterDialog(QDialog):
         layout.addWidget(title)
         
         form_layout = QFormLayout()
-        form_layout.setSpacing(15)
+        form_layout.setSpacing(18)  # Más espacio entre campos
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         
         self.nombre_edit = ModernLineEdit("Nombre")
         self.apellido_edit = ModernLineEdit("Apellido")
         self.area_combo = QComboBox()
         self.area_combo.addItems(["Control de Calidad", "Distribucion", "Produccion", "Logistica","Administracion","Sistemas"])
-        self.area_combo.setStyleSheet("""
+        combo_style = ("""
             QComboBox {
                 background-color: rgba(255, 255, 255, 0.9);
                 border: 2px solid rgba(52, 152, 219, 0.3);
                 border-radius: 10px;
                 padding: 12px 15px;
+                padding-right: 30px;
                 font-size: 14px;
                 color: #2c3e50;
                 font-weight: 500;
+                min-height: 20px;
             }
             QComboBox:focus {
                 border: 2px solid #3498db;
             }
             QComboBox::drop-down {
-                border: none;
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 25px;
+                border-left-width: 1px;
+                border-left-color: #3498db;
+                border-left-style: solid;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(52, 152, 219, 0.1), stop:1 rgba(52, 152, 219, 0.2));
             }
             QComboBox::down-arrow {
+                width: 12px;
+                height: 8px;
                 image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid #3498db;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 8px solid #3498db;
+                margin-right: 2px;
+            }
+            QComboBox::down-arrow:hover {
+                border-top-color: #2980b9;
+            }
+            QComboBox QAbstractItemView {
+                border: 2px solid #3498db;
+                border-radius: 8px;
+                background-color: white;
+                selection-background-color: #3498db;
+                selection-color: white;
+                padding: 5px;
             }
         """)
         self.puesto_combo = QComboBox()
         self.puesto_combo.addItems(["Operario", "Encargado", "Supervisor", "Administrativo","Administrador"])
         self.puesto_combo.setStyleSheet("""
-            QComboBox {
+                QComboBox {
                 background-color: rgba(255, 255, 255, 0.9);
                 border: 2px solid rgba(52, 152, 219, 0.3);
                 border-radius: 10px;
                 padding: 12px 15px;
+                padding-right: 30px;
                 font-size: 14px;
                 color: #2c3e50;
                 font-weight: 500;
+                min-height: 20px;
             }
             QComboBox:focus {
                 border: 2px solid #3498db;
             }
             QComboBox::drop-down {
-                border: none;
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 25px;
+                border-left-width: 1px;
+                border-left-color: #3498db;
+                border-left-style: solid;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(52, 152, 219, 0.1), stop:1 rgba(52, 152, 219, 0.2));
             }
             QComboBox::down-arrow {
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid #3498db;
+                width: 0;
+                height: 0;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 8px solid #3498db;
+                margin-right: 5px;
             }
-
+            QComboBox::down-arrow:hover {
+                border-top-color: #2980b9;
+            }
+            QComboBox QAbstractItemView {
+                border: 2px solid #3498db;
+                border-radius: 8px;
+                background-color: white;
+                selection-background-color: #3498db;
+                selection-color: white;
+                padding: 5px;
+            }
         """)
 
         self.turno_combo = QComboBox()
@@ -359,41 +410,90 @@ class RegisterDialog(QDialog):
                 border: 2px solid rgba(52, 152, 219, 0.3);
                 border-radius: 10px;
                 padding: 12px 15px;
+                padding-right: 30px;
                 font-size: 14px;
                 color: #2c3e50;
                 font-weight: 500;
+                min-height: 20px;
             }
             QComboBox:focus {
                 border: 2px solid #3498db;
             }
             QComboBox::drop-down {
-                border: none;
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 25px;
+                border-left-width: 1px;
+                border-left-color: #3498db;
+                border-left-style: solid;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(52, 152, 219, 0.1), stop:1 rgba(52, 152, 219, 0.2));
             }
             QComboBox::down-arrow {
+                width: 12px;
+                height: 8px;
                 image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid #3498db;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 8px solid #3498db;
+                margin-right: 2px;
+            }
+            QComboBox::down-arrow:hover {
+                border-top-color: #2980b9;
+            }
+            QComboBox QAbstractItemView {
+                border: 2px solid #3498db;
+                border-radius: 8px;
+                background-color: white;
+                selection-background-color: #3498db;
+                selection-color: white;
+                padding: 5px;
             }
         """)
         
         self.fecha_edit = QDateEdit()
         self.fecha_edit.setDate(QDate.currentDate())
-        self.fecha_edit.setStyleSheet("""
+        date_style = ("""
             QDateEdit {
-                background-color: rgba(255, 255, 255, 0.9);
-                border: 2px solid rgba(52, 152, 219, 0.3);
-                border-radius: 10px;
-                padding: 12px 15px;
-                font-size: 14px;
-                color: #2c3e50;
-                font-weight: 500;
-            }
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(52, 152, 219, 0.3);
+            border-radius: 10px;
+            padding: 12px 15px;
+            font-size: 14px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
             QDateEdit:focus {
                 border: 2px solid #3498db;
-            }
+        }
+            QDateEdit::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left-width: 1px;
+                border-left-color: #3498db;
+                border-left-style: solid;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+        }
+            QDateEdit::down-arrow {
+                width: 0;
+                height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #3498db;
+        }
         """)
+
+        self.area_combo.setStyleSheet(combo_style)
+        self.puesto_combo.setStyleSheet(combo_style)
+        self.turno_combo.setStyleSheet(combo_style)
         
+        # Aplicar estilo al DateEdit
+        self.fecha_edit.setStyleSheet(date_style)
+
         form_layout.addRow("Nombre:", self.nombre_edit)
         form_layout.addRow("Apellido:", self.apellido_edit)
         form_layout.addRow("Área:", self.area_combo)
@@ -519,3 +619,23 @@ class RegisterDialog(QDialog):
                     self.verification_successful = True
                     QTimer.singleShot(1500, self.accept)
                     
+            else:
+                confidence = distance * 100
+                color = (0, 0, 255)
+                text = f"NO COINCIDE ({confidence:.1f}%)"
+                
+                cv2.rectangle(frame, (left, top), (right, bottom), color, 3)
+                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), color, cv2.FILLED)
+                cv2.putText(frame, text, (left + 6, bottom - 6), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                
+                self.status_label.setText("Rostro no coincide")
+                self.status_label.setStyleSheet("""
+                    QLabel {
+                        font-size: 14px;
+                        color: #e74c3c;
+                        padding: 8px;
+                        font-weight: 600;
+                    }
+                """)
+                
