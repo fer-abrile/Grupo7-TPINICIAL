@@ -37,3 +37,13 @@ class FirebaseManager:
         except Exception as e:
             print(f"Error registrando usuario: {e}")
             return False
+        
+    def registra_evento(self, evento_usuario):
+        """Registra un evento de usuario en Firestore"""
+        try:
+            doc_ref = self.db.collection('eventos').document()
+            doc_ref.set(evento_usuario)
+            return True
+        except Exception as e:
+            print(f"Error registrando evento: {e}")
+            return False
