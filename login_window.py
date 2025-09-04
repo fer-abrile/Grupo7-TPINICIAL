@@ -413,9 +413,6 @@ class LoginWindow(QMainWindow):
                 )
                 self.registrar_checkin(usuario)
                 self.login_successful.emit(usuario)
-
-                # Abrir MainWindow y cerrar login después de un breve delay
-             #   QTimer.singleShot(1000, lambda: self.open_main_window(usuario))
                 return
             else:
                 # VERIFICACIÓN FALLIDA
@@ -428,11 +425,6 @@ class LoginWindow(QMainWindow):
             # Rehabilitar el botón
             self.login_button.setEnabled(True)
             self.login_button.setText("Iniciar Sesión")
-    #def open_main_window(self, usuario):
-      #  "Abre la ventana principal y cierra la de login"
-     #  main_window = MainWindow(usuario, self.firebase_manager)
-       # main_window.show()
-     #   self.close() 
 
     def registrar_checkin(self, usuario):
         if not self.firebase_manager.db:

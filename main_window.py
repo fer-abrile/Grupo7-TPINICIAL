@@ -330,5 +330,23 @@ class MainWindow(QMainWindow):
         self.btn_graficos.clicked.connect(lambda: self.content_area.setCurrentIndex(1))
         self.btn_empleados.clicked.connect(lambda: self.content_area.setCurrentIndex(2))
         self.btn_multicharts.clicked.connect(lambda: self.content_area.setCurrentIndex(3))
-        self.btn_salir.clicked.connect(self.close)
+        self.btn_salir.clicked.connect(self.realizar_checkout)
 
+
+    def realizar_checkout(self):
+            """Checkout manual desde el botón Salir"""
+            checkout_data = {
+                "EmpleadoID": self.usuario_data.get("EmpleadoID"),
+                "username": self.usuario_data.get("username"),
+                "timestamp": datetime.now().isoformat(),
+                "evento": "CheckOut"
+            }
+            
+            try:
+                if self.firebase_manager.db:
+                    self.firebase_manager.db.collection("eventos").add(checkout_data)
+                    QMessageBox.information(self, "Salida", "Se ha registrado el CheckOut correctamente.")
+                    self.close()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al registrar checkout: {str(e)}")
