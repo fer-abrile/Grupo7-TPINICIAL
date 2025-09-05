@@ -39,6 +39,7 @@ def get_empleados():
             'Apellido': data.get('Apellido'),
             'empleadoID': data.get('EmpleadoID'),
             'face_embedding': data.get('face_embedding')
+            
         })
     return jsonify(empleados)
 

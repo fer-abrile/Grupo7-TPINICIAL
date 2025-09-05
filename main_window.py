@@ -1,67 +1,88 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QLabel, QVBoxLayout, QWidget, QPushButton,
-    QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView, QHBoxLayout
+    QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView,
+    QHBoxLayout, QStackedWidget, QFrame
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 from datetime import datetime, date
+from collections import defaultdict
 from modern_components import ModernButton
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from MultiChartsPanel import MultiChartsPanel
-from collections import defaultdict
 import requests
 
-class GraphicsWindow(QMainWindow):
+# -----------------------------
+# PANEL DE BIENVENIDA
+# -----------------------------
+class WelcomePanel(QWidget):
+    def __init__(self, usuario_data, parent=None):
+        super().__init__(parent)
+        self.usuario_data = usuario_data
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        welcome_label = QLabel(f"¡Bienvenido al Sistema!")
+        welcome_label.setStyleSheet("font-size: 32px; font-weight: bold; color: #2c3e50; margin-bottom: 20px;")
+        welcome_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        user_label = QLabel(f"{self.usuario_data.get('Nombre', '')} {self.usuario_data.get('Apellido', '')}")
+        user_label.setStyleSheet("font-size: 24px; color: #34495e; margin-bottom: 30px;")
+        user_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        info_label = QLabel("Selecciona una opción del panel lateral para comenzar")
+        info_label.setStyleSheet("font-size: 16px; color: #7f8c8d; font-style: italic;")
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        layout.addWidget(welcome_label)
+        layout.addWidget(user_label)
+        layout.addWidget(info_label)
+
+        self.setLayout(layout)
+
+# -----------------------------
+# PANEL DE GRAFICOS
+# -----------------------------
+class GraphicsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Gráficos de Asistencia")
-        self.setFixedSize(900, 600)
         self.setup_ui()
         self.load_data()
 
     def setup_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
-        title = QLabel("Gráfico de Check-In/Check-Out del Día")
-        title.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
-                font-weight: bold;
-                color: #2c3e50;
-                margin-bottom: 20px;
-                text-align: center;
-            }
-        """)
+        layout.setContentsMargins(20,20,20,20)
+
+        title = QLabel("Gráficos de Asistencia")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 20px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
-        self.figure = Figure(figsize=(12, 6))
+
+        self.figure = Figure(figsize=(10,6))
         self.canvas = FigureCanvas(self.figure)
         layout.addWidget(self.canvas)
-        close_button = ModernButton("Cerrar", "secondary")
-        close_button.clicked.connect(self.close)
-        close_button.setFixedSize(100, 40)
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        button_layout.addWidget(close_button)
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-        central_widget.setLayout(layout)
+
+        self.setLayout(layout)
 
     def load_data(self):
         try:
             today = date.today().isoformat()
             response = requests.get('http://localhost:5000/get-eventos')
+            checkin_data = []
+            checkout_data = []
             if response.status_code == 200:
                 eventos = response.json()
-                checkin_data = [e for e in eventos if e.get("evento") == "CheckIn" and e.get("timestamp", "").startswith(today)]
-                checkout_data = [e for e in eventos if e.get("evento") == "CheckOut" and e.get("timestamp", "").startswith(today)]
-                self.create_chart(checkin_data, checkout_data)
-            else:
-                self.create_empty_chart()
+                for data in eventos:
+                    if data.get("timestamp", "").startswith(today):
+                        if data.get("evento") == "CheckIn":
+                            checkin_data.append(data)
+                        elif data.get("evento") == "CheckOut":
+                            checkout_data.append(data)
+            self.create_chart(checkin_data, checkout_data)
         except Exception as e:
             print(f"Error cargando datos: {e}")
             self.create_empty_chart()
@@ -71,283 +92,240 @@ class GraphicsWindow(QMainWindow):
         ax = self.figure.add_subplot(111)
         checkin_hours = defaultdict(int)
         checkout_hours = defaultdict(int)
-        for event in checkin_data:
+
+        for e in checkin_data:
             try:
-                timestamp = datetime.fromisoformat(event['timestamp'])
-                hour = timestamp.hour
-                checkin_hours[hour] += 1
-            except:
-                continue
-        for event in checkout_data:
+                timestamp = datetime.fromisoformat(e['timestamp'])
+                checkin_hours[timestamp.hour] += 1
+            except: continue
+
+        for e in checkout_data:
             try:
-                timestamp = datetime.fromisoformat(event['timestamp'])
-                hour = timestamp.hour
-                checkout_hours[hour] += 1
-            except:
-                continue
+                timestamp = datetime.fromisoformat(e['timestamp'])
+                checkout_hours[timestamp.hour] += 1
+            except: continue
+
         hours = range(24)
         checkin_counts = [checkin_hours[h] for h in hours]
         checkout_counts = [checkout_hours[h] for h in hours]
-        x_pos = range(24)
+
         width = 0.35
-        bars1 = ax.bar([x - width/2 for x in x_pos], checkin_counts, width,
-                       label='Check-In', color='#27ae60', alpha=0.8)
-        bars2 = ax.bar([x + width/2 for x in x_pos], checkout_counts, width,
-                       label='Check-Out', color='#e74c3c', alpha=0.8)
-        ax.set_xlabel('Hora del día')
-        ax.set_ylabel('Cantidad de eventos')
-        ax.set_title(f'Check-In/Check-Out - {date.today().strftime("%d/%m/%Y")}')
+        x_pos = range(24)
+        bars1 = ax.bar([x - width/2 for x in x_pos], checkin_counts, width, label='Check-In', color='#27ae60', alpha=0.8)
+        bars2 = ax.bar([x + width/2 for x in x_pos], checkout_counts, width, label='Check-Out', color='#e74c3c', alpha=0.8)
+
+        ax.set_xlabel("Hora del día")
+        ax.set_ylabel("Cantidad de eventos")
+        ax.set_title(f"Check-In/Check-Out - {date.today().strftime('%d/%m/%Y')}")
         ax.set_xticks(x_pos)
-        ax.set_xticklabels([f'{h:02d}:00' for h in hours], rotation=45)
+        ax.set_xticklabels([f"{h:02d}:00" for h in hours], rotation=45)
         ax.legend()
         ax.grid(True, alpha=0.3)
-        for bar in bars1:
-            height = bar.get_height()
-            if height > 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height + 0.05,
-                        f'{int(height)}', ha='center', va='bottom', fontsize=8)
-        for bar in bars2:
-            height = bar.get_height()
-            if height > 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height + 0.05,
-                        f'{int(height)}', ha='center', va='bottom', fontsize=8)
-        plt.tight_layout()
+
+        for bar in bars1 + bars2:
+            if bar.get_height() > 0:
+                ax.text(bar.get_x() + bar.get_width()/2., bar.get_height()+0.05, str(int(bar.get_height())), ha='center', va='bottom', fontsize=8)
+
         self.canvas.draw()
 
     def create_empty_chart(self):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-        ax.text(0.5, 0.5, 'No hay datos para mostrar hoy',
-                ha='center', va='center', transform=ax.transAxes, fontsize=16)
-        ax.set_title(f'Check-In/Check-Out - {date.today().strftime("%d/%m/%Y")}')
+        ax.text(0.5,0.5,"No hay datos para mostrar hoy", ha='center', va='center', transform=ax.transAxes, fontsize=16)
         self.canvas.draw()
 
-
-class EmployeeListWindow(QMainWindow):
+# -----------------------------
+# PANEL DE EMPLEADOS
+# -----------------------------
+class EmployeePanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Lista de Empleados")
-        self.setFixedSize(1000, 700)
         self.setup_ui()
         self.load_employees()
 
     def setup_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(20,20,20,20)
+
         title = QLabel("Lista de Empleados Registrados")
-        title.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
-                font-weight: bold;
-                color: #2c3e50;
-                margin-bottom: 20px;
-            }
-        """)
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 20px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
+
         self.table = QTableWidget()
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels([
-            "ID Empleado", "Nombre", "Apellido", "Área",
-            "Puesto", "Turno", "Fecha Ingreso", "Username"
-        ])
+        self.table.setHorizontalHeaderLabels(["ID Empleado","Nombre","Apellido","Área","Puesto","Turno","Fecha Ingreso","Username"])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                font-size: 12px;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #eee;
-            }
-            QTableWidget::item:selected {
-                background-color: #3498db;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: #34495e;
-                color: white;
-                padding: 10px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
         layout.addWidget(self.table)
-        button_layout = QHBoxLayout()
-        refresh_button = ModernButton("🔄 Actualizar", "primary")
-        refresh_button.clicked.connect(self.load_employees)
-        close_button = ModernButton("Cerrar", "secondary")
-        close_button.clicked.connect(self.close)
-        button_layout.addWidget(refresh_button)
-        button_layout.addStretch()
-        button_layout.addWidget(close_button)
-        layout.addLayout(button_layout)
-        central_widget.setLayout(layout)
+        self.setLayout(layout)
 
     def load_employees(self):
         try:
             response = requests.get('http://localhost:5000/get-empleados')
-            if response.status_code != 200:
-                QMessageBox.warning(self, "Error", "No se pudo obtener la lista de empleados")
-                return
-            employees = response.json()
-            self.table.setRowCount(len(employees))
-            for row, employee in enumerate(employees):
-                self.table.setItem(row, 0, QTableWidgetItem(employee.get("EmpleadoID", "")))
-                self.table.setItem(row, 1, QTableWidgetItem(employee.get("Nombre", "")))
-                self.table.setItem(row, 2, QTableWidgetItem(employee.get("Apellido", "")))
-                self.table.setItem(row, 3, QTableWidgetItem(employee.get("Area", "")))
-                self.table.setItem(row, 4, QTableWidgetItem(employee.get("Puesto", "")))
-                self.table.setItem(row, 5, QTableWidgetItem(employee.get("Turno", "")))
-                self.table.setItem(row, 6, QTableWidgetItem(employee.get("FechaIngreso", "")))
-                self.table.setItem(row, 7, QTableWidgetItem(employee.get("username", "")))
-            status_msg = f"Se cargaron {len(employees)} empleados"
-            QMessageBox.information(self, "Información", status_msg)
+            empleados = response.json() if response.status_code == 200 else []
+            self.table.setRowCount(len(empleados))
+            for row, emp in enumerate(empleados):
+                items = [
+                    emp.get("EmpleadoID","N/A"),
+                    emp.get("Nombre","N/A"),
+                    emp.get("Apellido","N/A"),
+                    emp.get("Area","N/A"),
+                    emp.get("Puesto","N/A"),
+                    emp.get("Turno","N/A"),
+                    emp.get("FechaIngreso","N/A"),
+                    emp.get("username","N/A")
+                ]
+                for col, text in enumerate(items):
+                    item = QTableWidgetItem(str(text))
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.table.setItem(row, col, item)
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error al cargar empleados: {str(e)}")
+            print(f"Error cargando empleados: {e}")
 
+# -----------------------------
+# PANEL MULTI-GRAFICOS
+# -----------------------------
+class MultiChartsPanel(QWidget):
+    """Panel con los 3 gráficos extra: por producto, materia prima y empleados por área"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+        self.load_data()
 
+    def setup_ui(self):
+        self.layout = QVBoxLayout()
+        self.layout.setContentsMargins(20,20,20,20)
+        self.figure = Figure(figsize=(12,8))
+        self.canvas = FigureCanvas(self.figure)
+        self.layout.addWidget(self.canvas)
+        self.setLayout(self.layout)
+
+    def load_data(self):
+        try:
+            self.figure.clear()
+            ax1 = self.figure.add_subplot(311)
+            ax2 = self.figure.add_subplot(312)
+            ax3 = self.figure.add_subplot(313)
+
+            productos_count = defaultdict(int)
+            materias_count = defaultdict(int)
+            area_count = defaultdict(int)
+
+            # Productos
+            r_prod = requests.get('http://localhost:5000/get-productos')
+            if r_prod.status_code == 200:
+                for data in r_prod.json():
+                    producto_id = data.get("id")
+                    stock_actual = data.get("stock_actual")
+                    if producto_id is not None and stock_actual is not None:
+                        productos_count[producto_id] = stock_actual
+
+            # Empleados
+            r_emp = requests.get('http://localhost:5000/get-empleados')
+            if r_emp.status_code == 200:
+                for data in r_emp.json():
+                    area = data.get("Area")
+                    if area: area_count[area] +=1
+
+            # Materia Prima
+            r_mat = requests.get('http://localhost:5000/get-materias')
+            if r_mat.status_code == 200:
+                for data in r_mat.json():
+                    materia = data.get("id")
+                    if materia: materias_count[materia] +=1
+
+            # Gráfico 1: Productos
+            ax1.bar(productos_count.keys(), productos_count.values(), color="#3498db", alpha=0.8)
+            ax1.set_title("Stock actual por Producto")
+            ax1.set_xlabel("ID Producto")
+            ax1.set_ylabel("Stock Actual")
+
+            # Gráfico 2: Materias primas
+            ax2.bar(materias_count.keys(), materias_count.values(), color="#2ecc71", alpha=0.8)
+            ax2.set_title("Recuento por Materia Prima")
+
+            # Gráfico 3: Empleados por área
+            ax3.bar(area_count.keys(), area_count.values(), color="#e74c3c", alpha=0.8)
+            ax3.set_title("Empleados por Área")
+
+            self.figure.tight_layout()
+            self.canvas.draw()
+        except Exception as e:
+            print(f"Error cargando multi-graficos: {e}")
+
+# -----------------------------
+# MAIN WINDOW
+# -----------------------------
 class MainWindow(QMainWindow):
     def __init__(self, usuario_data):
         super().__init__()
         self.usuario_data = usuario_data
-        self.checkout_realizado = False
-        self.setWindowTitle("Menú Principal")
-        self.setFixedSize(900, 700)
-        self.setStyleSheet("""
-        QMainWindow {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 #667db6, stop:0.5 #0082c8, stop:1 #667db6);
-        }
-        QWidget#card {
-            background-color: white;
-            border-radius: 25px;
-            padding: 70px;
-        }
-        QLabel#title {
-            font-size: 28px;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 40px;
-        }
-        QWidget#card QPushButton {
-            font-size: 18px;
-            font-weight: bold;
-            padding: 16px;
-            border-radius: 12px;
-            min-width: 260px;
-            color: white;
-        }
-        QWidget#card QPushButton#graficos {
-            background-color: #2980b9;
-        }
-        QWidget#card QPushButton#graficos:hover {
-            background-color: #1f6391;
-        }
-        QWidget#card QPushButton#empleados {
-            background-color: #27ae60;
-        }
-        QWidget#card QPushButton#empleados:hover {
-            background-color: #1e8449;
-        }
-        QWidget#card QPushButton#salir {
-            background-color: #e74c3c;
-        }
-        QWidget#card QPushButton#salir:hover {
-            background-color: #c0392b;
-        }
-        QWidget#card QPushButton#multi {
-            background-color: #8e44ad;
-        }
-        QWidget#card QPushButton#multi:hover {
-            background-color: #6c3483;
-        }
-    """)
+        self.setWindowTitle("Sistema de Gestión de Empleados")
+        self.setFixedSize(1200, 800)
+        self.setup_ui()
+
+    def setup_ui(self):
         central_widget = QWidget()
-        main_layout = QVBoxLayout()
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card = QWidget()
-        card.setObjectName("card")
-        card_layout = QVBoxLayout()
-        card_layout.setSpacing(35)
-        card_layout.setContentsMargins(40, 40, 40, 40)
-        card_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label = QLabel(f"Bienvenido, {usuario_data['Nombre']} {usuario_data['Apellido']}")
-        label.setObjectName("title")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card_layout.addWidget(label)
-        self.btn_graficos = ModernButton("📊 Ver Gráficos", "primary")
-        self.btn_graficos.setObjectName("graficos")
-        self.btn_empleados = ModernButton("👥 Ver Empleados", "success")
-        self.btn_empleados.setObjectName("empleados")
-        self.btn_salir = ModernButton("🚪 Salir", "danger")
-        self.btn_salir.setObjectName("salir")
-        self.btn_multi = ModernButton("📈 Multi-Gráficos", "primary")
-        self.btn_multi.setObjectName("multi")
-        self.btn_graficos.clicked.connect(self.ver_graficos)
-        self.btn_empleados.clicked.connect(self.ver_empleados)
-        self.btn_salir.clicked.connect(self.realizar_checkout)
-        self.btn_multi.clicked.connect(self.ver_multi_graficos)
-        card_layout.addWidget(self.btn_graficos)
-        card_layout.addWidget(self.btn_empleados)
-        card_layout.addWidget(self.btn_salir)
-        card_layout.addWidget(self.btn_multi)
-        card.setLayout(card_layout)
-        main_layout.addWidget(card)
-        central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
-    def ver_graficos(self):
-        self.graphics_window = GraphicsWindow(self)
-        self.graphics_window.show()
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0,0,0,0)
+        main_layout.setSpacing(0)
 
-    def ver_empleados(self):
-        self.employee_window = EmployeeListWindow(self)
-        self.employee_window.show()
+        # ---------------- Sidebar
+        sidebar = QFrame()
+        sidebar.setFixedWidth(300)
+        sidebar_layout = QVBoxLayout()
+        sidebar_layout.setContentsMargins(20,30,20,30)
+        sidebar_layout.setSpacing(15)
 
-    def ver_multi_graficos(self):
-        self.multi_charts_window = MultiChartsPanel(self)
-        self.multi_charts_window.show()
+        panel_title = QLabel("Panel de Control")
+        panel_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sidebar_layout.addWidget(panel_title)
 
-    def closeEvent(self, event: QCloseEvent):
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Salir del Sistema")
-        dialog.setText("¿Qué desea hacer?")
-        dialog.setInformativeText("Seleccione una opción:")
-        btn_checkout_salir = dialog.addButton("Hacer CheckOut y Salir", QMessageBox.ButtonRole.AcceptRole)
-        btn_solo_salir = dialog.addButton("Solo Salir", QMessageBox.ButtonRole.DestructiveRole)
-        btn_cancelar = dialog.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
-        dialog.setDefaultButton(btn_cancelar)
-        dialog.exec()
-        clicked_button = dialog.clickedButton()
-        if clicked_button == btn_checkout_salir:
-            self.realizar_checkout_y_salir()
-            event.accept()
-        elif clicked_button == btn_solo_salir:
-            event.accept()
-        else:
-            event.ignore()
+        self.btn_inicio = ModernButton("🏠 Inicio", "secondary")
+        self.btn_graficos = ModernButton("📊 CheckIn/Out", "primary")
+        self.btn_empleados = ModernButton("👥 Empleados", "success")
+        self.btn_multicharts = ModernButton("📈 Otros Gráficos", "warning")
+        self.btn_salir = ModernButton("🚪 Salir", "danger")
 
-    def realizar_checkout_y_salir(self):
-        checkout_data = {
-            "EmpleadoID": self.usuario_data.get("EmpleadoID"),
-            "username": self.usuario_data.get("username"),
-            "timestamp": datetime.now().isoformat(),
-            "evento": "CheckOut"
-        }
-        try:
-            response = requests.post('http://localhost:5000/register-evento', json=checkout_data)
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error al registrar checkout: {str(e)}")
+        sidebar_layout.addWidget(self.btn_inicio)
+        sidebar_layout.addWidget(self.btn_graficos)
+        sidebar_layout.addWidget(self.btn_empleados)
+        sidebar_layout.addWidget(self.btn_multicharts)
+        sidebar_layout.addStretch()
+        sidebar_layout.addWidget(self.btn_salir)
+
+        sidebar.setLayout(sidebar_layout)
+
+        # ---------------- Contenido
+        self.content_area = QStackedWidget()
+        self.welcome_panel = WelcomePanel(self.usuario_data)
+        self.graphics_panel = GraphicsPanel()
+        self.employee_panel = EmployeePanel()
+        self.multi_charts_panel = MultiChartsPanel()
+
+        self.content_area.addWidget(self.welcome_panel)     # 0
+        self.content_area.addWidget(self.graphics_panel)    # 1
+        self.content_area.addWidget(self.employee_panel)    # 2
+        self.content_area.addWidget(self.multi_charts_panel) # 3
+
+        self.content_area.setCurrentIndex(0)
+
+        main_layout.addWidget(sidebar)
+        main_layout.addWidget(self.content_area,1)
+        central_widget.setLayout(main_layout)
+
+        # Conexiones botones
+        self.btn_inicio.clicked.connect(lambda: self.content_area.setCurrentIndex(0))
+        self.btn_graficos.clicked.connect(lambda: self.content_area.setCurrentIndex(1))
+        self.btn_empleados.clicked.connect(lambda: self.content_area.setCurrentIndex(2))
+        self.btn_multicharts.clicked.connect(lambda: self.content_area.setCurrentIndex(3))
+        self.btn_salir.clicked.connect(self.realizar_checkout)
 
     def realizar_checkout(self):
+        """Checkout manual desde el botón Salir"""
         checkout_data = {
             "EmpleadoID": self.usuario_data.get("EmpleadoID"),
             "username": self.usuario_data.get("username"),
