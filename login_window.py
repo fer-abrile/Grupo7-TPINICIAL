@@ -2,7 +2,6 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QLineEdit, QMessageBox, QApplication, QDialog, QPushButton)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
-from firebase_manager import FirebaseManager
 from modern_components import ModernLineEdit, ModernButton, AnimatedCard
 from register_dialog import RegisterDialog
 from datetime import datetime
@@ -10,6 +9,7 @@ from main_window import MainWindow
 import face_recognition
 import numpy as np
 import cv2
+import requests
 
 class FacialVerificationDialog(QDialog):
     def __init__(self, parent=None, known_embedding=None, username=""):
@@ -239,7 +239,6 @@ class LoginWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.firebase_manager = FirebaseManager()
         self.setup_ui()
         self.setup_window()
         
@@ -366,15 +365,17 @@ class LoginWindow(QMainWindow):
             self.show_message("Por favor complete todos los campos")
             return
 
-        if not self.firebase_manager.db:
-            self.show_message("Error de conexión con la base de datos")
-            return
-
         self.login_button.setEnabled(False)
         self.login_button.setText("Validando...")
 
         try:
-            usuario = self.firebase_manager.buscar_usuario(username)
+            response = requests.get('http://localhost:5000/get-empleados')
+            if response.status_code != 200:
+                self.show_message("Error al conectar con la API")
+                return
+
+            empleados = response.json()
+            usuario = next((e for e in empleados if e.get('username') == username), None)
 
             if not usuario:
                 reply = QMessageBox.question(self, "Usuario no encontrado",
@@ -384,29 +385,22 @@ class LoginWindow(QMainWindow):
                     self.show_register()
                 return
 
-            # Verificar contraseña
             if password != usuario.get('password', ''):
                 self.show_message("Contraseña incorrecta")
                 return
 
-            # Verificar que existe el embedding facial
             if 'face_embedding' not in usuario or not usuario['face_embedding']:
                 self.show_message("El usuario no tiene rostro registrado.")
                 return
 
-            # Iniciar verificación facial con el diálogo mejorado
             known_embedding = np.array(usuario['face_embedding'])
             verification_dialog = FacialVerificationDialog(
                 self, 
                 known_embedding=known_embedding, 
                 username=usuario.get('Nombre', username)
             )
-            
-            # Mostrar diálogo de verificación
             result = verification_dialog.exec()
-            
             if result and verification_dialog.verification_successful:
-                # VERIFICACIÓN EXITOSA
                 self.show_message(
                     f"¡Bienvenido {usuario['Nombre']} {usuario['Apellido']}!", 
                     "#27ae60"
@@ -415,33 +409,59 @@ class LoginWindow(QMainWindow):
                 self.login_successful.emit(usuario)
                 return
             else:
-                # VERIFICACIÓN FALLIDA
                 self.show_message("Verificación facial cancelada o fallida.")
-                
         except Exception as e:
             self.show_message(f"Error durante la verificación: {str(e)}")
-            
         finally:
-            # Rehabilitar el botón
             self.login_button.setEnabled(True)
             self.login_button.setText("Iniciar Sesión")
 
     def registrar_checkin(self, usuario):
-        if not self.firebase_manager.db:
-            return
         checkin_data = {
             "EmpleadoID": usuario.get("EmpleadoID"),
             "username": usuario.get("username"),
             "timestamp": datetime.now().isoformat(),
             "evento": "CheckIn"
         }
-        # Registrar evento en Firebase
-        if hasattr(self.firebase_manager, "registrar_evento"):
-            self.firebase_manager.registrar_evento(checkin_data)
-        else:
-            self.firebase_manager.db.collection("eventos").add(checkin_data)
+        try:
+            response = requests.post(
+                "http://localhost:5000/register-evento",
+                json=checkin_data
+            )
+            if response.status_code == 200:
+                print("CheckIn registrado en la API")
+            else:
+                print(f"Error al registrar CheckIn: {response.text}")
+        except Exception as e:
+            print(f"Error de conexión con la API: {e}")
     
     def show_register(self):
-        dialog = RegisterDialog(self, self.firebase_manager)
+        dialog = RegisterDialog(self)
         if dialog.exec():
             self.show_message("Empleado registrado exitosamente. Puede iniciar sesión.", "#27ae60")
+    
+    def handle_login(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+        if self.validar_login(username, password):
+            QMessageBox.information(self, "Login", "¡Login exitoso!")
+            self.status_label.setText("Login exitoso")
+            # Aquí puedes continuar con el flujo de tu aplicación
+        else:
+            QMessageBox.warning(self, "Login", "Usuario o contraseña incorrectos")
+            self.status_label.setText("Login fallido")
+
+    def validar_login(self, username, password):
+        try:
+            response = requests.get('http://localhost:5000/get-empleados')
+            if response.status_code != 200:
+                self.status_label.setText("Error al conectar con la API")
+                return False
+            empleados = response.json()
+            for empleado in empleados:
+                if empleado.get('username') == username and empleado.get('password') == password:
+                    return True
+            return False
+        except Exception as e:
+            self.status_label.setText(f"Error: {e}")
+            return False

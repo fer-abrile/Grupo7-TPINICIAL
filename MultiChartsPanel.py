@@ -2,13 +2,12 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea, QSizePoli
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from collections import defaultdict
-from datetime import datetime
+import requests
 
 class MultiChartsPanel(QWidget):
-    """Panel para mostrar múltiples gráficos basados en Firebase"""
-    def __init__(self, firebase_manager, parent=None):
+    """Panel para mostrar múltiples gráficos basados en la API Flask"""
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.firebase_manager = firebase_manager
         self.setup_ui()
         self.load_data()
     
@@ -34,28 +33,29 @@ class MultiChartsPanel(QWidget):
         self.setLayout(layout)
     
     def load_data(self):
-        """Carga datos desde Firebase y crea los gráficos"""
+        """Carga datos desde la API Flask y crea los gráficos"""
         try:
             # Datos de MateriaPrima
             materia_prima = []
-            if self.firebase_manager.db:
-                docs = self.firebase_manager.db.collection("MateriaPrima").stream()
-                for doc in docs:
-                    materia_prima.append(doc.to_dict())
+            r_mat = requests.get('http://localhost:5000/get-materias')
+            if r_mat.status_code == 200:
+                materia_prima = r_mat.json()
             print("materia prima lista:", materia_prima)
+
             # Datos de empleados
             employees = []
-            if self.firebase_manager.db:
-                docs = self.firebase_manager.db.collection("Empleados").stream()
-                for doc in docs:
-                    employees.append(doc.to_dict())
-            print("empleados",employees)
+            r_emp = requests.get('http://localhost:5000/get-empleados')
+            if r_emp.status_code == 200:
+                employees = r_emp.json()
+            print("empleados", employees)
+
+            # Datos de productos
             products = []
-            if self.firebase_manager.db:
-                docs = self.firebase_manager.db.collection("Productos").stream()
-                for doc in docs:
-                    products.append(doc.to_dict())
-            print("productos",products)
+            r_prod = requests.get('http://localhost:5000/get-productos')
+            if r_prod.status_code == 200:
+                products = r_prod.json()
+            print("productos", products)
+
             # Crear gráficos
             self.create_chart_by_product(products)
             self.create_chart_by_material(materia_prima)
@@ -74,46 +74,22 @@ class MultiChartsPanel(QWidget):
         
         self.add_bar_chart(counts, "Recuento por Producto", "Producto", "Cantidad")
     
-    def create_chart_by_material(self):
+    def create_chart_by_material(self, materia_prima):
         """Gráfico: Recuento por Materia Prima"""
-        try:
-            docs = list(self.firebase_manager.db.collection("MateriaPrima").stream())
-            if not docs:
-                print(" No hay datos en la colección MateriaPrima")
-                return
+        counts = defaultdict(int)
+        for data in materia_prima:
+            materia = data.get("id", "Desconocida")
+            counts[materia] += 1
 
-            counts = defaultdict(int)
-            for doc in docs:
-                data = doc.to_dict()
-                materia = data.get("id", "Desconocida")  # o data.get("nombre")
-                counts[materia] += 1
+        self.add_bar_chart(counts, "Recuento por Materia Prima", "Materia Prima", "Cantidad")
 
-            self.add_bar_chart(counts, "Recuento por Materia Prima", "Materia Prima", "Cantidad")
-
-        except Exception as e:
-            print(f"Error creando gráfico de Materia Prima: {e}")
-
-    def create_chart_employees_by_area(self):
+    def create_chart_employees_by_area(self, employees):
         """Gráfico: Cantidad de empleados por área"""
-        try:
-            docs = list(self.firebase_manager.db.collection("Empleados").stream())
-            if not docs:
-                print("⚠️ No hay datos en la colección Empleados")
-                return
-
-            counts = defaultdict(int)
-            for doc in docs:
-                data = doc.to_dict()
-                area = data.get("Area", "Sin Área")
-                counts[area] += 1
-
-            self.add_bar_chart(counts, "Empleados por Área", "Área", "Cantidad")
-
-        except Exception as e:
-            print(f"Error creando gráfico de Empleados por Área: {e}")
+        counts = defaultdict(int)
+        for data in employees:
             area = data.get("Area", "Sin Área")
             counts[area] += 1
-        
+
         self.add_bar_chart(counts, "Empleados por Área", "Área", "Cantidad")
     
     # ---------------- MÉTODO AUXILIAR ----------------
