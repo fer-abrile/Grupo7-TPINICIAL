@@ -1,5 +1,3 @@
-# role_based_windows_api.py
-
 from PyQt6.QtWidgets import (
     QMainWindow, QLabel, QVBoxLayout, QWidget, QPushButton,
     QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -1979,33 +1977,3 @@ def integrate_with_main_app():
 
 # Exportar función principal para main_app.py
 create_role_based_window = integrate_with_main_app()
-
-if __name__ == "__main__":
-    # Código de prueba (opcional)
-    import sys
-    from PyQt6.QtWidgets import QApplication
-    
-    app = QApplication(sys.argv)
-    
-    # Datos de prueba
-    test_admin_data = {
-        'EmpleadoID': 'ADM001',
-        'Nombre': 'Juan',
-        'Apellido': 'Pérez',
-        'Puesto': 'Administrativo',
-        'username': 'jperez'
-    }
-    
-    test_operario_data = {
-        'EmpleadoID': 'OP001',
-        'Nombre': 'María',
-        'Apellido': 'González',
-        'Puesto': 'Operario',
-        'username': 'mgonzalez'
-    }
-    
-    # Crear ventana de administrador para prueba
-    admin_window = WindowFactory.create_window(test_admin_data)
-    admin_window.show()
-    
-    sys.exit(app.exec())

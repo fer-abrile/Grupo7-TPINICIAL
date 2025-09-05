@@ -341,31 +341,5 @@ def main():
     # Ejecutar aplicación
     sys.exit(app.exec())
 
-def create_test_window():
-    """Función para testing - crear ventana sin login"""
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-    
-    # Datos de prueba para administrativo
-    test_admin_data = {
-        'EmpleadoID': 'TEST001',
-        'Nombre': 'Usuario',
-        'Apellido': 'Prueba',
-        'Puesto': 'Administrativo',
-        'Area': 'Administración',
-        'username': 'test_admin',
-        'Turno': 'Mañana'
-    }
-    
-    # Crear ventana de prueba
-    test_window = WindowFactory.create_window(test_admin_data)
-    test_window.show()
-    
-    sys.exit(app.exec())
-
 if __name__ == "__main__":
-    # Verificar si se quiere modo de prueba
-    if len(sys.argv) > 1 and sys.argv[1] == '--test':
-        create_test_window()
-    else:
         main()
