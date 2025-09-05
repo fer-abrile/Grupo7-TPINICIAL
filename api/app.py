@@ -74,6 +74,83 @@ def register_empleado():
     })
     return jsonify({'message': 'Empleado registrado'})
 
+@app.route('/add-empleado', methods=['POST'])
+def add_empleado():
+    data = request.get_json()
+    
+    empleado_data = {
+        'Apellido': data.get('Apellido', ''),
+        'Area': data.get('Area', ''),
+        'EmpleadoID': data.get('EmpleadoID', ''),
+        'FechaIngreso': data.get('FechaIngreso', ''),
+        'Nombre': data.get('Nombre', ''),
+        'Puesto': data.get('Puesto', ''),
+        'Turno': data.get('Turno', ''),
+        'username': data.get('username', ''),
+        'temporal': data.get('temporal', False),
+        'face_embedding': data.get('face_embedding', []),
+        'password': data.get('password', 'temp123'),  # Default temp password
+        'fecha_registro': data.get('fecha_registro', '')
+    }
+    
+    try:
+        db.collection('empleados').add(empleado_data)
+        return jsonify({'message': 'Empleado agregado correctamente'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/update-empleado/<empleado_id>', methods=['PUT'])
+def update_empleado(empleado_id):
+    data = request.get_json()
+    
+    try:
+        # Find the document by EmpleadoID
+        empleados_ref = db.collection('empleados')
+        query = empleados_ref.where('EmpleadoID', '==', empleado_id).limit(1)
+        docs = query.stream()
+        
+        doc_found = False
+        for doc in docs:
+            doc_found = True
+            doc.reference.update({
+                'Apellido': data.get('Apellido', ''),
+                'Area': data.get('Area', ''),
+                'FechaIngreso': data.get('FechaIngreso', ''),
+                'Nombre': data.get('Nombre', ''),
+                'Puesto': data.get('Puesto', ''),
+                'Turno': data.get('Turno', ''),
+                'username': data.get('username', '')
+            })
+            break
+        
+        if not doc_found:
+            return jsonify({'error': 'Empleado no encontrado'}), 404
+            
+        return jsonify({'message': 'Empleado actualizado correctamente'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/delete-empleado/<empleado_id>', methods=['DELETE'])
+def delete_empleado(empleado_id):
+    try:
+        # Find the document by EmpleadoID
+        empleados_ref = db.collection('empleados')
+        query = empleados_ref.where('EmpleadoID', '==', empleado_id).limit(1)
+        docs = query.stream()
+        
+        doc_found = False
+        for doc in docs:
+            doc_found = True
+            doc.reference.delete()
+            break
+        
+        if not doc_found:
+            return jsonify({'error': 'Empleado no encontrado'}), 404
+            
+        return jsonify({'message': 'Empleado eliminado correctamente'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/register-evento', methods=['POST'])
 def register_evento():
     data = request.get_json()
@@ -106,6 +183,56 @@ def get_materias():
             "stock_actual": mat.get("stock_actual")
         })
     return jsonify(data)
+
+@app.route('/get-produccion', methods=['GET'])
+def get_produccion():
+    try:
+        produccion = db.collection('produccion').stream()
+        data = [doc.to_dict() for doc in produccion]
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/register-produccion', methods=['POST'])
+def register_produccion():
+    try:
+        data = request.get_json()
+        db.collection('produccion').add({
+            'producto': data.get('producto', ''),
+            'cantidad': data.get('cantidad', 0),
+            'turno': data.get('turno', ''),
+            'timestamp': data.get('timestamp', ''),
+            'operario': data.get('operario', '')
+        })
+        return jsonify({'message': 'Producción registrada correctamente'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/get-incidencias', methods=['GET'])
+def get_incidencias():
+    try:
+        incidencias = db.collection('incidencias').stream()
+        data = [doc.to_dict() for doc in incidencias]
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/register-incidencia', methods=['POST'])
+def register_incidencia():
+    try:
+        data = request.get_json()
+        db.collection('incidencias').add({
+            'tipo': data.get('tipo', ''),
+            'prioridad': data.get('prioridad', ''),
+            'descripcion': data.get('descripcion', ''),
+            'empleado_id': data.get('empleado_id', ''),
+            'empleado_nombre': data.get('empleado_nombre', ''),
+            'timestamp': data.get('timestamp', ''),
+            'estado': data.get('estado', 'Pendiente')
+        })
+        return jsonify({'message': 'Incidencia registrada correctamente'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
