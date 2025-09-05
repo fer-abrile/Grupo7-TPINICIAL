@@ -15,6 +15,7 @@ cred = credentials.Certificate(json.loads(firebase_key_json))
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+#Test API
 @app.route('/ping', methods=['GET'])
 def ping():
     return jsonify({'message': 'pong'})
@@ -28,20 +29,22 @@ def get_data():
 
 @app.route('/get-empleados', methods=['GET'])
 def get_empleados():
-    docs = db.collection('empleados').stream()
-    empleados = []
-    for doc in docs:
-        data = doc.to_dict()
-        empleados.append({
-            'username': data.get('username'),
-            'password': data.get('password'),
-            'Nombre': data.get('Nombre'),
-            'Apellido': data.get('Apellido'),
-            'empleadoID': data.get('EmpleadoID'),
-            'face_embedding': data.get('face_embedding'),
-            'Area': data.get('Area')
-        })
-    return jsonify(empleados)
+    empleados = db.collection('empleados').stream()
+    data = [doc.to_dict() for doc in empleados]
+    return jsonify(data)
+
+@app.route('/get-fake-empleados', methods=['GET'])
+def get_fake_empleados():
+    fake_empleados = db.collection('Empleados').stream()
+    data = [doc.to_dict() for doc in fake_empleados]
+    return jsonify(data)
+
+@app.route('/get-eventos', methods=['GET'])
+def get_eventos():
+    eventos = db.collection('eventos').stream()
+    data = [doc.to_dict() for doc in eventos]
+    return jsonify(data)
+
 
 @app.route('/register-empleado', methods=['POST'])
 def register_empleado():
@@ -77,11 +80,6 @@ def register_evento():
     db.collection('eventos').add(data)
     return jsonify({'message': 'Evento registrado'})
 
-@app.route('/get-eventos', methods=['GET'])
-def get_eventos():
-    eventos = db.collection('eventos').stream()
-    data = [doc.to_dict() for doc in eventos]
-    return jsonify(data)
 
 @app.route('/get-productos', methods=['GET'])
 def get_productos():

@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, QDate, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from datetime import datetime
 from modern_components import ModernLineEdit, ModernButton
-
+import requests
 import cv2
 import face_recognition
 import numpy as np
@@ -267,11 +267,10 @@ class CameraPopup(QDialog):
 
 
 class RegisterDialog(QDialog):
-    def __init__(self, parent, firebase_manager):
+    def __init__(self, parent):
         super().__init__(parent)
-        self.firebase_manager = firebase_manager
         self.setWindowTitle("Registro de Empleado")
-        self.setFixedSize(650, 650)  # Más ancho y alto
+        self.setFixedSize(650, 650)
         self.setModal(True)
         self.face_embedding = None
         
@@ -608,34 +607,13 @@ class RegisterDialog(QDialog):
             'face_embedding': self.face_embedding
         }
         
-        if self.firebase_manager.db and self.firebase_manager.registrar_usuario(datos_usuario):
-            QMessageBox.information(self, "Éxito", 
-                f"Empleado registrado exitosamente.\nEmpleadoID: {empleado_id}\nUsername: {username}\nContraseña: 12345")
-            self.accept()
-        else:
-            QMessageBox.critical(self, "Error", "Error al registrar el empleado")
-                
-            if not self.verification_successful:
-                    self.verification_successful = True
-                    QTimer.singleShot(1500, self.accept)
-                    
+        try:
+            response = requests.post('http://localhost:5000/register-empleado', json=datos_usuario)
+            if response.status_code == 200:
+                QMessageBox.information(self, "Éxito", 
+                    f"Empleado registrado exitosamente.\nEmpleadoID: {empleado_id}\nUsername: {username}\nContraseña: 12345")
+                self.accept()
             else:
-                confidence = distance * 100
-                color = (0, 0, 255)
-                text = f"NO COINCIDE ({confidence:.1f}%)"
-                
-                cv2.rectangle(frame, (left, top), (right, bottom), color, 3)
-                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), color, cv2.FILLED)
-                cv2.putText(frame, text, (left + 6, bottom - 6), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                
-                self.status_label.setText("Rostro no coincide")
-                self.status_label.setStyleSheet("""
-                    QLabel {
-                        font-size: 14px;
-                        color: #e74c3c;
-                        padding: 8px;
-                        font-weight: 600;
-                    }
-                """)
-                
+                QMessageBox.critical(self, "Error", "Error al registrar el empleado")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al registrar el empleado: {str(e)}")

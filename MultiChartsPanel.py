@@ -44,7 +44,7 @@ class MultiChartsPanel(QWidget):
 
             # Datos de empleados
             employees = []
-            r_emp = requests.get('http://localhost:5000/get-empleados')
+            r_emp = requests.get('http://localhost:5000/get-fake-empleados')
             if r_emp.status_code == 200:
                 employees = r_emp.json()
             print("empleados", employees)

@@ -222,7 +222,7 @@ class MultiChartsPanel(QWidget):
                         productos_count[producto_id] = stock_actual
 
             # Empleados
-            r_emp = requests.get('http://localhost:5000/get-empleados')
+            r_emp = requests.get('http://localhost:5000/get-fake-empleados')
             if r_emp.status_code == 200:
                 for data in r_emp.json():
                     area = data.get("Area")
@@ -233,7 +233,9 @@ class MultiChartsPanel(QWidget):
             if r_mat.status_code == 200:
                 for data in r_mat.json():
                     materia = data.get("id")
-                    if materia: materias_count[materia] +=1
+                    stock_actual = data.get("stock_actual")
+                    if materia is not None and stock_actual is not None:
+                        materias_count[materia] = stock_actual
 
             # Gráfico 1: Productos
             ax1.bar(productos_count.keys(), productos_count.values(), color="#3498db", alpha=0.8)
