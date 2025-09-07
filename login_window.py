@@ -241,6 +241,7 @@ class LoginWindow(QMainWindow):
         super().__init__()
         self.setup_ui()
         self.setup_window()
+        print("LoginWindow initialized")
         
     def setup_window(self):
         self.setWindowTitle("Sistema de Gestión - Login")
