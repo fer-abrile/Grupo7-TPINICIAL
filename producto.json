@@ -1,0 +1,72 @@
+[
+  {
+    "ID Producto": "P001",
+    "Nombre": "Harina 1kg",
+    "Stock Actual": 50,
+    "Stock Mínimo": 20,
+    "Estado": "Disponible"
+  },
+  {
+    "ID Producto": "P002",
+    "Nombre": "Azúcar 1kg",
+    "Stock Actual": 15,
+    "Stock Mínimo": 20,
+    "Estado": "Bajo Stock"
+  },
+  {
+    "ID Producto": "P003",
+    "Nombre": "Aceite 1L",
+    "Stock Actual": 0,
+    "Stock Mínimo": 10,
+    "Estado": "Agotado"
+  },
+  {
+    "ID Producto": "P004",
+    "Nombre": "Arroz 1kg",
+    "Stock Actual": 40,
+    "Stock Mínimo": 15,
+    "Estado": "Disponible"
+  },
+  {
+    "ID Producto": "P005",
+    "Nombre": "Leche en polvo",
+    "Stock Actual": 8,
+    "Stock Mínimo": 10,
+    "Estado": "Bajo Stock"
+  },
+  {
+    "ID Producto": "P006",
+    "Nombre": "Fideos 500g",
+    "Stock Actual": 70,
+    "Stock Mínimo": 25,
+    "Estado": "Disponible"
+  },
+  {
+    "ID Producto": "P007",
+    "Nombre": "Yerba Mate 1kg",
+    "Stock Actual": 5,
+    "Stock Mínimo": 15,
+    "Estado": "Bajo Stock"
+  },
+  {
+    "ID Producto": "P008",
+    "Nombre": "Galletitas surtidas",
+    "Stock Actual": 0,
+    "Stock Mínimo": 5,
+    "Estado": "Agotado"
+  },
+  {
+    "ID Producto": "P009",
+    "Nombre": "Café 500g",
+    "Stock Actual": 22,
+    "Stock Mínimo": 10,
+    "Estado": "Disponible"
+  },
+  {
+    "ID Producto": "P010",
+    "Nombre": "Sal fina 1kg",
+    "Stock Actual": 12,
+    "Stock Mínimo": 10,
+    "Estado": "Disponible"
+  }
+]

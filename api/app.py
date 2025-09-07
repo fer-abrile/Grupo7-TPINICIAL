@@ -89,7 +89,7 @@ def add_empleado():
         'username': data.get('username', ''),
         'temporal': data.get('temporal', False),
         'face_embedding': data.get('face_embedding', []),
-        'password': data.get('password', 'temp123'),  # Default temp password
+        'password': data.get('password', '12345'),
         'fecha_registro': data.get('fecha_registro', '')
     }
     
@@ -160,16 +160,23 @@ def register_evento():
 
 @app.route('/get-productos', methods=['GET'])
 def get_productos():
-    productos = db.collection('Productos').stream()
-    data = []
-    for doc in productos:
-        prod = doc.to_dict()
-        data.append({
-            "id": prod.get("id"),
-            "nombre": prod.get("nombre"),
-            "stock_actual": prod.get("stock_actual")
-        })
-    return jsonify(data)
+    try:
+        productos = db.collection('productos').stream()
+        data = []
+        for doc in productos:
+            prod = doc.to_dict()
+            print(f"Producto encontrado: {prod}")  # Debug line
+            data.append({
+                "id": prod.get("id"),
+                "nombre": prod.get("nombre"),
+                "stock_actual": prod.get("stock_actual", 0),
+                "stock_minimo": prod.get("stock_minimo", 0)
+            })
+        print(f"Total productos: {len(data)}")  # Debug line
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error getting productos: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/get-materias', methods=['GET'])
 def get_materias():
@@ -231,6 +238,202 @@ def register_incidencia():
             'estado': data.get('estado', 'Pendiente')
         })
         return jsonify({'message': 'Incidencia registrada correctamente'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/update-stock', methods=['POST'])
+def update_stock():
+    try:
+        data = request.get_json()
+        print(f"Request data received: {data}")  # Debug line
+        
+        producto_id = data.get('producto_id')
+        cantidad = data.get('cantidad', 0)
+        operacion = data.get('operacion', 'incrementar')
+        
+        if not producto_id:
+            return jsonify({'error': 'producto_id es requerido'}), 400
+        
+        print(f"Buscando producto con ID: {producto_id}, tipo: {type(producto_id)}")  # Debug
+        
+        # Intentar buscar por ID como string primero, luego como int
+        productos_ref = db.collection('productos')
+        
+        # Buscar como string
+        query = productos_ref.where('id', '==', str(producto_id)).limit(1)
+        docs = list(query.stream())
+        
+        # Si no encuentra, buscar como int
+        if not docs:
+            print(f"No encontrado como string, buscando como int")
+            try:
+                query = productos_ref.where('id', '==', int(producto_id)).limit(1)
+                docs = list(query.stream())
+            except ValueError:
+                pass
+        
+        if not docs:
+            print(f"Producto no encontrado con ID: {producto_id}")
+            return jsonify({'error': f'Producto no encontrado con ID: {producto_id}'}), 404
+        
+        doc = docs[0]
+        producto_data = doc.to_dict()
+        stock_actual = producto_data.get('stock_actual', 0)
+        
+        print(f"Producto encontrado: {producto_data}")
+        print(f"Stock actual: {stock_actual}, Cantidad: {cantidad}, Operación: {operacion}")
+        
+        # Calcular nuevo stock
+        if operacion == 'incrementar':
+            nuevo_stock = stock_actual + cantidad
+        elif operacion == 'decrementar':
+            nuevo_stock = max(0, stock_actual - cantidad)  # No permitir stock negativo
+        else:
+            return jsonify({'error': 'Operación no válida'}), 400
+        
+        print(f"Nuevo stock calculado: {nuevo_stock}")
+        
+        # Actualizar el documento
+        doc.reference.update({'stock_actual': nuevo_stock})
+        
+        print(f"Stock actualizado exitosamente")
+        
+        return jsonify({
+            'message': 'Stock actualizado correctamente',
+            'stock_anterior': stock_actual,
+            'stock_nuevo': nuevo_stock,
+            'producto_id': producto_id
+        })
+        
+    except Exception as e:
+        print(f"Error in update_stock: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/productos/<producto_id>/stock-absoluto', methods=['PUT'])
+def set_stock_absoluto(producto_id):
+    try:
+        data = request.get_json()
+        stock_absoluto = data.get('stock_absoluto', 0)
+        
+        # Buscar el producto
+        productos_ref = db.collection('productos')
+        query = productos_ref.where('id', '==', int(producto_id)).limit(1)
+        docs = list(query.stream())
+        
+        if not docs:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        doc = docs[0]
+        doc.reference.update({'stock_actual': stock_absoluto})
+        
+        return jsonify({
+            'message': 'Stock establecido correctamente',
+            'stock_nuevo': stock_absoluto
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/productos/<producto_id>', methods=['PUT'])
+def update_producto(producto_id):
+    try:
+        data = request.get_json()
+        
+        # Buscar el producto
+        productos_ref = db.collection('productos')
+        query = productos_ref.where('id', '==', int(producto_id)).limit(1)
+        docs = list(query.stream())
+        
+        if not docs:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        doc = docs[0]
+        
+        # Actualizar campos proporcionados
+        update_data = {}
+        if 'stock_actual' in data:
+            update_data['stock_actual'] = data['stock_actual']
+        if 'nombre' in data:
+            update_data['nombre'] = data['nombre']
+        if 'stock_minimo' in data:
+            update_data['stock_minimo'] = data['stock_minimo']
+        
+        if update_data:
+            doc.reference.update(update_data)
+            return jsonify({'message': 'Producto actualizado correctamente'})
+        else:
+            return jsonify({'error': 'No hay datos para actualizar'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/register-desperdicio', methods=['POST'])
+def register_desperdicio():
+    try:
+        data = request.get_json()
+        
+        # Validar datos requeridos
+        if not data.get('producto'):
+            return jsonify({'error': 'Producto es requerido'}), 400
+        if not data.get('cantidad') or data.get('cantidad') <= 0:
+            return jsonify({'error': 'Cantidad debe ser mayor a 0'}), 400
+        
+        # Registrar el desperdicio
+        desperdicio_data = {
+            'producto': data.get('producto', ''),
+            'producto_id': data.get('producto_id', ''),
+            'cantidad': data.get('cantidad', 0),
+            'motivo': data.get('motivo', ''),
+            'descripcion': data.get('descripcion', ''),
+            'timestamp': data.get('timestamp', ''),
+            'operario': data.get('operario', ''),
+            'tipo': 'desperdicio'
+        }
+        
+        db.collection('desperdicios').add(desperdicio_data)
+        
+        return jsonify({'message': 'Desperdicio registrado correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get-desperdicios', methods=['GET'])
+def get_desperdicios():
+    try:
+        desperdicios = db.collection('desperdicios').stream()
+        data = [doc.to_dict() for doc in desperdicios]
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/set-stock-total', methods=['POST'])
+def set_stock_total():
+    try:
+        data = request.get_json()
+        producto_id = data.get('producto_id')
+        cantidad_total = data.get('cantidad_total', 0)
+        
+        if not producto_id:
+            return jsonify({'error': 'producto_id es requerido'}), 400
+        
+        # Buscar el producto
+        productos_ref = db.collection('productos')
+        query = productos_ref.where('id', '==', int(producto_id)).limit(1)
+        docs = list(query.stream())
+        
+        if not docs:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        doc = docs[0]
+        doc.reference.update({'stock_actual': cantidad_total})
+        
+        return jsonify({
+            'message': 'Stock total establecido correctamente',
+            'stock_nuevo': cantidad_total
+        })
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

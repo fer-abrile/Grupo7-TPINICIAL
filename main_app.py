@@ -85,6 +85,11 @@ class MainApp(QMainWindow):
     def agregar_empleado(self, empleado_data):
         """Agregar empleado usando el endpoint add-empleado"""
         try:
+            # Si es temporal, establecer password por defecto
+            if empleado_data.get('temporal', False):
+                empleado_data['password'] = '12345'
+                empleado_data['face_embedding'] = []  # Sin reconocimiento facial
+                
             response = requests.post('http://localhost:5000/add-empleado', json=empleado_data)
             if response.status_code == 200:
                 print("Empleado agregado correctamente")

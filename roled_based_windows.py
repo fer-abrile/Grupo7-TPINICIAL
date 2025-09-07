@@ -22,16 +22,21 @@ class WindowFactory:
     @staticmethod
     def create_window(usuario_data):
         puesto = usuario_data.get('Puesto', '').lower()
+        is_temporal = usuario_data.get('temporal', False)
+        
+        # Si es temporal, usar la ventana temporal independientemente del puesto
+        if is_temporal:
+            from main_window import TemporalWindow
+            return TemporalWindow(usuario_data)
         
         if puesto == 'administrativo':
             return AdministrativeWindow(usuario_data)
         elif puesto == 'operario':
             return OperativeWindow(usuario_data)
         else:
-            # Para otros puestos, usar ventana genérica (la original)
+            # Para otros puestos, usar ventana genérica
             from main_window import MainWindow
             return MainWindow(usuario_data)
-
 # -----------------------------
 # PANELES COMUNES
 # -----------------------------
@@ -307,8 +312,8 @@ class OperativeWindow(QMainWindow):
         # Crear paneles específicos para operarios
         welcome_msg = "Controla la producción, gestiona el inventario y reporta incidencias desde tu panel operativo."
         self.welcome_panel = WelcomePanel(self.usuario_data, welcome_msg)
-        self.production_panel = ProductionControlPanel()
-        self.inventory_panel = InventoryPanel()
+        self.production_panel = ProductionControlPanel(self.usuario_data)
+        self.inventory_panel = InventoryPanel(self.usuario_data)  
         self.incident_panel = IncidentReportPanel(self.usuario_data)
         self.my_attendance_panel = MyAttendancePanel(self.usuario_data)
 
@@ -317,6 +322,8 @@ class OperativeWindow(QMainWindow):
         self.content_area.addWidget(self.inventory_panel)      # 2
         self.content_area.addWidget(self.incident_panel)       # 3
         self.content_area.addWidget(self.my_attendance_panel)  # 4
+
+        self.inventory_panel.production_panel = self.production_panel
 
         self.content_area.setCurrentIndex(0)
 
@@ -611,11 +618,14 @@ class ReportsPanel(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        # Botón para actualizar datos
+        # Botones para actualizar datos y OEE
         button_layout = QHBoxLayout()
         self.btn_refresh = ModernButton("🔄 Actualizar Reportes", "primary")
         self.btn_refresh.clicked.connect(self.load_reports)
+        self.btn_oee = ModernButton("📊 Ver OEE", "success")
+        self.btn_oee.clicked.connect(self.show_oee_chart)
         button_layout.addWidget(self.btn_refresh)
+        button_layout.addWidget(self.btn_oee)
         button_layout.addStretch()
         layout.addLayout(button_layout)
 
@@ -648,59 +658,60 @@ class ReportsPanel(QWidget):
             print(f"Error generando reportes: {e}")
 
     def create_production_2024_chart(self, ax):
-        """Gráfico de cantidad producida en 2024"""
+        """Gráfico de torta de cantidad producida en 2024 por producto - CORREGIDO"""
         try:
             # Obtener datos de producción del 2024
             produccion_data = self.get_produccion_data()
             
-            # Filtrar datos del 2024 y agrupar por mes
-            monthly_production = defaultdict(int)
+            # Filtrar datos del 2024 y agrupar por producto
+            product_production = defaultdict(int)
             
             for prod in produccion_data:
                 try:
                     timestamp_str = prod.get('timestamp', '')
                     if timestamp_str.startswith('2024'):
-                        timestamp = datetime.fromisoformat(timestamp_str)
-                        month_key = timestamp.strftime('%Y-%m')
+                        producto = prod.get('producto', 'Producto Desconocido')
                         cantidad = prod.get('cantidad', 0)
-                        monthly_production[month_key] += cantidad
+                        product_production[producto] += cantidad
                 except:
                     continue
             
             # Si no hay datos reales, usar datos de ejemplo
-            if not monthly_production:
-                monthly_production = {
-                    '2024-01': 1200, '2024-02': 1450, '2024-03': 1680, '2024-04': 1320,
-                    '2024-05': 1590, '2024-06': 1750, '2024-07': 1890, '2024-08': 1650,
-                    '2024-09': 1420, '2024-10': 1580, '2024-11': 1720, '2024-12': 1900
+            if not product_production:
+                product_production = {
+                    'Producto A': 4500, 'Producto B': 3800, 'Producto C': 5200,
+                    'Producto D': 2900, 'Producto E': 3600
                 }
             
-            # Preparar datos para el gráfico
-            months = sorted(monthly_production.keys())
-            production_values = [monthly_production[month] for month in months]
-            month_labels = [datetime.strptime(month, '%Y-%m').strftime('%b') for month in months]
+            # Preparar datos para el gráfico de torta
+            products = list(product_production.keys())
+            production_values = list(product_production.values())
             
-            # Crear gráfico de barras con gradiente
-            bars = ax.bar(month_labels, production_values, color='#3498db', alpha=0.8, edgecolor='#2980b9', linewidth=2)
+            # Colores para cada producto
+            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3',
+                    '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43']
             
-            # Agregar valores en las barras
-            for bar in bars:
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height + max(production_values)*0.01,
-                       f'{int(height):,}', ha='center', va='bottom', fontweight='bold', fontsize=9)
+            # Crear gráfico de torta
+            wedges, texts, autotexts = ax.pie(production_values, labels=products, autopct='%1.1f%%', 
+                                            colors=colors[:len(products)], startangle=90, 
+                                            textprops={'fontsize': 9, 'fontweight': 'bold'})
             
-            ax.set_title('Cantidad Producida 2024', fontweight='bold', fontsize=14, pad=15)
-            ax.set_xlabel('Mes', fontweight='bold')
-            ax.set_ylabel('Unidades Producidas', fontweight='bold')
-            ax.grid(True, alpha=0.3, axis='y')
-            ax.set_ylim(0, max(production_values) * 1.1)
+            # Mejorar el formato de los porcentajes
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
             
-            # Mejorar formato de números en el eje Y
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+            ax.set_title('Producción 2024 por Producto', 
+                        fontweight='bold', fontsize=14, pad=20)
+            
+            # Añadir leyenda con totales
+            legend_labels = [f'{product}: {value:,}' for product, value in zip(products, production_values)]
+            ax.legend(wedges, legend_labels, title="Producción por Producto", 
+                    loc="center left", bbox_to_anchor=(1, 0, 0.5, 1), fontsize=8)
             
         except Exception as e:
             ax.text(0.5, 0.5, f'Error cargando datos de producción\n{str(e)}', 
-                   ha='center', va='center', transform=ax.transAxes, fontsize=10)
+                ha='center', va='center', transform=ax.transAxes, fontsize=10)
 
     def create_quarterly_waste_production_chart(self, ax):
         """Gráfico de desperdicio y producción por trimestre"""
@@ -980,6 +991,298 @@ class ReportsPanel(QWidget):
         except Exception as e:
             print(f"Error obteniendo datos de eventos: {e}")
         return []
+    
+    def show_oee_chart(self):
+        """Mostrar gráfico OEE en ventana separada"""
+        try:
+            # Crear nueva ventana para OEE
+            self.oee_window = QDialog(self)
+            self.oee_window.setWindowTitle("Overall Equipment Effectiveness (OEE)")
+            self.oee_window.setFixedSize(1000, 700)
+            
+            layout = QVBoxLayout(self.oee_window)
+            
+            # Título
+            title = QLabel("Análisis OEE (Overall Equipment Effectiveness)")
+            title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            title.setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50; margin: 15px;")
+            layout.addWidget(title)
+            
+            # Crear figura para OEE
+            oee_figure = Figure(figsize=(12, 8))
+            oee_canvas = FigureCanvas(oee_figure)
+            
+            # Generar gráfico OEE
+            self.generate_oee_chart(oee_figure)
+            
+            layout.addWidget(oee_canvas)
+            
+            # Botón cerrar
+            close_btn = ModernButton("Cerrar", "secondary")
+            close_btn.clicked.connect(self.oee_window.close)
+            close_layout = QHBoxLayout()
+            close_layout.addStretch()
+            close_layout.addWidget(close_btn)
+            close_layout.addStretch()
+            layout.addLayout(close_layout)
+            
+            self.oee_window.setLayout(layout)
+            self.oee_window.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error mostrando gráfico OEE: {str(e)}")
+
+    def generate_oee_chart(self, figure):
+        """Generar gráfico OEE completo"""
+        try:
+            figure.clear()
+            
+            # Crear subgráficos (2x2)
+            ax1 = figure.add_subplot(2, 2, 1)  # OEE por mes
+            ax2 = figure.add_subplot(2, 2, 2)  # Componentes OEE actual
+            ax3 = figure.add_subplot(2, 2, 3)  # Tendencia OEE semanal
+            ax4 = figure.add_subplot(2, 2, 4)  # Disponibilidad vs Performance vs Calidad
+            
+            # Obtener datos para OEE
+            oee_data = self.calculate_oee_metrics()
+            
+            self.create_monthly_oee_chart(ax1, oee_data)
+            self.create_oee_components_chart(ax2, oee_data)
+            self.create_weekly_oee_trend_chart(ax3, oee_data)
+            self.create_oee_comparison_chart(ax4, oee_data)
+            
+            figure.suptitle('Dashboard OEE - Overall Equipment Effectiveness', 
+                        fontsize=16, fontweight='bold', y=0.95)
+            figure.tight_layout(rect=[0, 0.03, 1, 0.95])
+            
+        except Exception as e:
+            print(f"Error generando gráfico OEE: {e}")
+
+    def calculate_oee_metrics(self):
+        """Calcular métricas OEE basadas en datos reales"""
+        try:
+            # Obtener datos necesarios
+            produccion_data = self.get_produccion_data()
+            desperdicio_data = self.get_desperdicio_data()
+            
+            # Datos por defecto si no hay datos reales
+            default_data = {
+                'monthly': {
+                    'Enero': 72, 'Febrero': 75, 'Marzo': 78, 'Abril': 81,
+                    'Mayo': 77, 'Junio': 83, 'Julio': 85, 'Agosto': 82,
+                    'Septiembre': 86, 'Octubre': 88, 'Noviembre': 84, 'Diciembre': 87
+                },
+                'current_components': {
+                    'Disponibilidad': 92,  # % tiempo operativo / tiempo planificado
+                    'Performance': 87,     # % velocidad real / velocidad ideal
+                    'Calidad': 94         # % productos buenos / productos totales
+                },
+                'weekly': [
+                    {'semana': 'S1', 'oee': 82},
+                    {'semana': 'S2', 'oee': 85},
+                    {'semana': 'S3', 'oee': 78},
+                    {'semana': 'S4', 'oee': 88},
+                    {'semana': 'S5', 'oee': 84},
+                    {'semana': 'S6', 'oee': 87},
+                    {'semana': 'S7', 'oee': 89},
+                    {'semana': 'S8', 'oee': 86}
+                ],
+                'areas': {
+                    'Producción': {'disponibilidad': 91, 'performance': 85, 'calidad': 96},
+                    'Línea A': {'disponibilidad': 89, 'performance': 90, 'calidad': 92},
+                    'Línea B': {'disponibilidad': 94, 'performance': 82, 'calidad': 95},
+                    'Empaque': {'disponibilidad': 88, 'performance': 88, 'calidad': 98}
+                }
+            }
+            
+            # Si hay datos reales, calcular métricas reales
+            if produccion_data and len(produccion_data) > 0:
+                # Calcular disponibilidad basada en tiempo de producción
+                total_produccion = sum(item.get('cantidad', 0) for item in produccion_data)
+                
+                # Calcular calidad basada en desperdicios
+                total_desperdicios = sum(item.get('cantidad', 0) for item in desperdicio_data) if desperdicio_data else 0
+                calidad_real = max(0, min(100, ((total_produccion - total_desperdicios) / max(1, total_produccion)) * 100))
+                
+                # Actualizar componentes actuales con datos reales
+                default_data['current_components']['Calidad'] = calidad_real
+                
+                # Ajustar OEE basado en producción real vs esperada
+                produccion_esperada = 100 * len(set(item.get('timestamp', '')[:10] for item in produccion_data))  # 100 por día
+                performance_real = min(100, (total_produccion / max(1, produccion_esperada)) * 100)
+                default_data['current_components']['Performance'] = performance_real
+            
+            return default_data
+            
+        except Exception as e:
+            print(f"Error calculando métricas OEE: {e}")
+            # Retornar datos por defecto en caso de error
+            return {
+                'monthly': {'Enero': 75, 'Febrero': 78, 'Marzo': 82},
+                'current_components': {'Disponibilidad': 85, 'Performance': 80, 'Calidad': 90},
+                'weekly': [{'semana': f'S{i}', 'oee': 75 + i*2} for i in range(1, 9)],
+                'areas': {'Producción': {'disponibilidad': 85, 'performance': 80, 'calidad': 90}}
+            }
+
+    def create_monthly_oee_chart(self, ax, oee_data):
+        """Gráfico OEE mensual"""
+        try:
+            monthly_data = oee_data['monthly']
+            meses = list(monthly_data.keys())[-6:]  # Últimos 6 meses
+            valores = [monthly_data[mes] for mes in meses]
+            
+            # Crear línea con puntos
+            line = ax.plot(meses, valores, marker='o', linewidth=3, markersize=8, 
+                        color='#3498db', markerfacecolor='#2980b9', markeredgecolor='white', markeredgewidth=2)
+            
+            # Rellenar área bajo la curva
+            ax.fill_between(meses, valores, alpha=0.3, color='#3498db')
+            
+            # Agregar valores en los puntos
+            for i, valor in enumerate(valores):
+                ax.annotate(f'{valor}%', (i, valor), textcoords="offset points", 
+                        xytext=(0,10), ha='center', fontweight='bold', fontsize=10)
+            
+            # Línea de referencia para OEE objetivo (85%)
+            ax.axhline(y=85, color='#e74c3c', linestyle='--', alpha=0.7, linewidth=2, label='Objetivo 85%')
+            
+            ax.set_title('OEE Mensual - Tendencia', fontweight='bold', fontsize=12, pad=15)
+            ax.set_ylabel('OEE (%)', fontweight='bold')
+            ax.set_ylim(60, 100)
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            
+            # Rotar etiquetas del eje X
+            plt.setp(ax.get_xticklabels(), rotation=45)
+            
+        except Exception as e:
+            ax.text(0.5, 0.5, f'Error cargando OEE mensual\n{str(e)}', 
+                ha='center', va='center', transform=ax.transAxes)
+
+    def create_oee_components_chart(self, ax, oee_data):
+        """Gráfico de componentes OEE actual (Disponibilidad, Performance, Calidad)"""
+        try:
+            components = oee_data['current_components']
+            
+            # Preparar datos
+            labels = list(components.keys())
+            values = list(components.values())
+            
+            # Colores específicos para cada componente
+            colors = ['#27ae60', '#f39c12', '#e74c3c']  # Verde, Naranja, Rojo
+            
+            # Crear gráfico de barras horizontal
+            bars = ax.barh(labels, values, color=colors, alpha=0.8, height=0.6)
+            
+            # Agregar valores en las barras
+            for i, (bar, value) in enumerate(zip(bars, values)):
+                width = bar.get_width()
+                ax.text(width + 1, bar.get_y() + bar.get_height()/2,
+                    f'{value}%', ha='left', va='center', fontweight='bold', fontsize=11)
+            
+            # Calcular OEE total
+            oee_total = (values[0] * values[1] * values[2]) / 10000  # (A * P * Q) / 100²
+            
+            ax.set_title(f'Componentes OEE Actual\nOEE Total: {oee_total:.1f}%', 
+                        fontweight='bold', fontsize=12, pad=15)
+            ax.set_xlabel('Porcentaje (%)', fontweight='bold')
+            ax.set_xlim(0, 100)
+            
+            # Líneas de referencia
+            ax.axvline(x=85, color='gray', linestyle='--', alpha=0.5, label='Objetivo')
+            ax.grid(True, alpha=0.3, axis='x')
+            
+        except Exception as e:
+            ax.text(0.5, 0.5, f'Error cargando componentes OEE\n{str(e)}', 
+                ha='center', va='center', transform=ax.transAxes)
+
+    def create_weekly_oee_trend_chart(self, ax, oee_data):
+        """Gráfico de tendencia OEE semanal"""
+        try:
+            weekly_data = oee_data['weekly']
+            
+            semanas = [item['semana'] for item in weekly_data]
+            oee_values = [item['oee'] for item in weekly_data]
+            
+            # Crear gráfico de área
+            ax.fill_between(range(len(semanas)), oee_values, alpha=0.4, color='#9b59b6')
+            ax.plot(range(len(semanas)), oee_values, marker='s', linewidth=2, 
+                markersize=6, color='#8e44ad', markerfacecolor='#9b59b6')
+            
+            # Agregar valores
+            for i, valor in enumerate(oee_values):
+                ax.annotate(f'{valor}%', (i, valor), textcoords="offset points", 
+                        xytext=(0,8), ha='center', fontsize=9, fontweight='bold')
+            
+            # Línea de referencia
+            ax.axhline(y=85, color='#e74c3c', linestyle='--', alpha=0.7, 
+                    linewidth=2, label='Objetivo 85%')
+            
+            ax.set_title('Tendencia OEE Semanal', fontweight='bold', fontsize=12, pad=15)
+            ax.set_xlabel('Semanas', fontweight='bold')
+            ax.set_ylabel('OEE (%)', fontweight='bold')
+            ax.set_xticks(range(len(semanas)))
+            ax.set_xticklabels(semanas)
+            ax.set_ylim(70, 100)
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            
+        except Exception as e:
+            ax.text(0.5, 0.5, f'Error cargando tendencia semanal\n{str(e)}', 
+                ha='center', va='center', transform=ax.transAxes)
+
+    def create_oee_comparison_chart(self, ax, oee_data):
+        """Gráfico de comparación OEE por áreas"""
+        try:
+            areas_data = oee_data['areas']
+            
+            areas = list(areas_data.keys())
+            disponibilidad = [areas_data[area]['disponibilidad'] for area in areas]
+            performance = [areas_data[area]['performance'] for area in areas]
+            calidad = [areas_data[area]['calidad'] for area in areas]
+            
+            # Calcular OEE por área
+            oee_por_area = [(d * p * c) / 10000 for d, p, c in zip(disponibilidad, performance, calidad)]
+            
+            # Configurar posiciones de las barras
+            x_pos = range(len(areas))
+            
+            # Crear barras para OEE total
+            bars = ax.bar(x_pos, oee_por_area, color=['#3498db', '#27ae60', '#f39c12', '#e74c3c'][:len(areas)], 
+                        alpha=0.8, width=0.6)
+            
+            # Agregar valores en las barras
+            for bar, value in zip(bars, oee_por_area):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                    f'{value:.1f}%', ha='center', va='bottom', fontweight='bold')
+            
+            # Línea de objetivo
+            ax.axhline(y=85, color='red', linestyle='--', alpha=0.7, label='Objetivo 85%')
+            
+            ax.set_title('OEE por Área/Línea de Producción', fontweight='bold', fontsize=12, pad=15)
+            ax.set_xlabel('Áreas', fontweight='bold')
+            ax.set_ylabel('OEE (%)', fontweight='bold')
+            ax.set_xticks(x_pos)
+            ax.set_xticklabels(areas, rotation=45, ha='right')
+            ax.set_ylim(0, 100)
+            ax.grid(True, alpha=0.3, axis='y')
+            ax.legend()
+            
+        except Exception as e:
+            ax.text(0.5, 0.5, f'Error cargando comparación por áreas\n{str(e)}', 
+                ha='center', va='center', transform=ax.transAxes)
+
+    def get_desperdicio_data(self):
+        """Obtener datos de desperdicio desde la API"""
+        try:
+            response = requests.get('http://localhost:5000/get-desperdicios')
+            if response.status_code == 200:
+                return response.json()
+        except Exception as e:
+            print(f"Error obteniendo datos de desperdicio: {e}")
+        return []
+    
 
 class AttendanceControlPanel(QWidget):
     def __init__(self, parent=None):
@@ -1126,11 +1429,15 @@ class ConfigurationPanel(QWidget):
 # -----------------------------
 # PANELES ESPECÍFICOS PARA OPERARIOS
 # -----------------------------
+# Código corregido para la clase ProductionControlPanel
+
 class ProductionControlPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, usuario_data, parent=None):
         super().__init__(parent)
+        self.usuario_data = usuario_data
         self.setup_ui()
         self.load_production_data()
+        self.update_kpis_after_production()
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -1141,17 +1448,32 @@ class ProductionControlPanel(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        # Sección de métricas rápidas
+        # Sección de métricas rápidas - CORREGIDO
         metrics_layout = QHBoxLayout()
-        metrics_layout.setSpacing(15)
+        metrics_layout.setSpacing(20)
         
-        # Tarjetas de métricas
-        self.create_metric_card("Producción Hoy", "0 unidades", "#3498db", metrics_layout)
-        self.create_metric_card("Eficiencia", "85%", "#27ae60", metrics_layout)
-        self.create_metric_card("Defectos", "2", "#e74c3c", metrics_layout)
+        # Crear las tarjetas correctamente
+        self.produccion_card = self.create_metric_card("Producción Hoy", "0", "#3498db")
+        self.eficiencia_card = self.create_metric_card("Eficiencia", "0%", "#27ae60") 
+        self.defectos_card = self.create_metric_card("Desperdicio", "0", "#e74c3c")
+
+        metrics_layout.addWidget(self.produccion_card)
+        metrics_layout.addWidget(self.eficiencia_card)
+        metrics_layout.addWidget(self.defectos_card)
         
         layout.addLayout(metrics_layout)
+        kpi_update_layout = QHBoxLayout()
+        self.btn_update_kpis = ModernButton("🔄 Actualizar Métricas", "secondary")
+        self.btn_update_kpis.clicked.connect(self.update_kpis_after_production)
+        self.btn_update_kpis.setMaximumWidth(200)
+        
+        kpi_update_layout.addStretch()
+        kpi_update_layout.addWidget(self.btn_update_kpis)
+        kpi_update_layout.addStretch()
+    
+        layout.addLayout(kpi_update_layout)
 
+        
         # Formulario para registrar producción
         form_layout = QVBoxLayout()
         form_section = QLabel("Registrar Producción")
@@ -1160,7 +1482,6 @@ class ProductionControlPanel(QWidget):
 
         form_inputs = QFormLayout()
         self.producto_combo = QComboBox()
-        # Cargar productos reales de la API
         self.load_products()
         
         self.cantidad_spin = QSpinBox()
@@ -1170,7 +1491,6 @@ class ProductionControlPanel(QWidget):
         self.turno_combo = QComboBox()
         self.turno_combo.addItems(["Mañana", "Tarde", "Noche"])
         
-        # Aplicar estilos
         combo_style = """
             QComboBox, QSpinBox {
                 padding: 8px;
@@ -1215,6 +1535,157 @@ class ProductionControlPanel(QWidget):
         layout.addWidget(self.production_table)
         self.setLayout(layout)
 
+    def create_metric_card(self, title, value, color):
+        """Crear tarjeta de métrica - VERSIÓN CORREGIDA"""
+        # Crear contenedor principal
+        card_container = QWidget()
+        card_container.setFixedHeight(120)
+        
+        # Layout principal de la tarjeta
+        main_layout = QVBoxLayout(card_container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Widget interno con el estilo
+        inner_card = QWidget()
+        inner_card.setStyleSheet(f"""
+            QWidget {{
+                background-color: {color};
+                border-radius: 12px;
+                border: 2px solid rgba(255, 255, 255, 0.2);
+            }}
+        """)
+        
+        # Layout del contenido interno
+        content_layout = QVBoxLayout(inner_card)
+        content_layout.setContentsMargins(15, 15, 15, 15)
+        content_layout.setSpacing(5)
+        
+        # Título
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: white; 
+                font-size: 14px; 
+                font-weight: bold;
+                text-align: center;
+                margin-bottom: 5px;
+            }
+        """)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setWordWrap(True)
+        
+        # Valor
+        value_label = QLabel(str(value))
+        value_label.setStyleSheet("""
+            QLabel {
+                color: white; 
+                font-size: 24px; 
+                font-weight: bold;
+                text-align: center;
+                margin-top: 5px;
+            }
+        """)
+        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        content_layout.addWidget(title_label)
+        content_layout.addWidget(value_label)
+        
+        # Agregar el widget interno al contenedor principal
+        main_layout.addWidget(inner_card)
+        
+        # Guardar referencias para actualización posterior
+        card_container.title_label = title_label
+        card_container.value_label = value_label
+        card_container.inner_card = inner_card
+        
+        return card_container
+
+    def update_kpis_after_production(self):
+        """Actualizar KPIs - VERSIÓN CORREGIDA"""
+        try:
+            # Obtener datos de producción
+            produccion_hoy = 0
+            defectos_hoy = 0
+            
+            # Obtener producción del día
+            try:
+                response = requests.get('http://localhost:5000/get-produccion')
+                if response.status_code == 200:
+                    produccion_data = response.json()
+                    today = datetime.now().date()
+                    
+                    for item in produccion_data:
+                        try:
+                            timestamp_str = item.get('timestamp', '')
+                            if timestamp_str:
+                                timestamp = datetime.fromisoformat(timestamp_str)
+                                item_date = timestamp.date()
+                                
+                                if item_date == today:
+                                    cantidad = item.get('cantidad', 0)
+                                    produccion_hoy += cantidad
+                        except Exception:
+                            continue
+                            
+            except Exception:
+                produccion_hoy = 0
+            
+            # Obtener desperdicios del día (si existe el endpoint)
+            try:
+                response = requests.get('http://localhost:5000/get-desperdicios')
+                if response.status_code == 200:
+                    desperdicio_data = response.json()
+                    today = datetime.now().date()
+                    
+                    for item in desperdicio_data:
+                        try:
+                            timestamp_str = item.get('timestamp', '')
+                            if timestamp_str:
+                                timestamp = datetime.fromisoformat(timestamp_str)
+                                item_date = timestamp.date()
+                                
+                                if item_date == today:
+                                    cantidad = item.get('cantidad', 0)
+                                    defectos_hoy += cantidad
+                        except Exception:
+                            continue
+                            
+            except Exception:
+                defectos_hoy = 0
+            
+            # Calcular eficiencia (basada en meta de 100 items por día)
+            meta_diaria = 100
+            eficiencia = min(100, (produccion_hoy / meta_diaria) * 100) if meta_diaria > 0 else 0
+            
+            # Actualizar tarjetas usando las referencias guardadas
+            if hasattr(self.produccion_card, 'value_label'):
+                self.produccion_card.value_label.setText(str(produccion_hoy))
+                print(f"Producción actualizada: {produccion_hoy}")
+            
+            if hasattr(self.eficiencia_card, 'value_label'):
+                self.eficiencia_card.value_label.setText(f"{eficiencia:.1f}%")
+                print(f"Eficiencia actualizada: {eficiencia:.1f}%")
+                
+            if hasattr(self.defectos_card, 'value_label'):
+                self.defectos_card.value_label.setText(str(defectos_hoy))
+                print(f"Desperdicio actualizado: {defectos_hoy}")
+            
+            # Forzar actualización visual
+            self.produccion_card.repaint()
+            self.eficiencia_card.repaint()
+            self.defectos_card.repaint()
+            
+        except Exception as e:
+            print(f"Error actualizando KPIs: {e}")
+            # En caso de error, mostrar valores por defecto
+            if hasattr(self.produccion_card, 'value_label'):
+                self.produccion_card.value_label.setText("Error")
+            if hasattr(self.eficiencia_card, 'value_label'):
+                self.eficiencia_card.value_label.setText("Error")  
+            if hasattr(self.defectos_card, 'value_label'):
+                self.defectos_card.value_label.setText("0")
+
     def load_products(self):
         """Cargar productos desde la API"""
         try:
@@ -1226,59 +1697,56 @@ class ProductionControlPanel(QWidget):
                     nombre = producto.get('nombre', f"Producto {producto.get('id', 'N/A')}")
                     self.producto_combo.addItem(f"{nombre} (ID: {producto.get('id', 'N/A')})")
             else:
-                # Fallback si la API no responde
                 self.producto_combo.addItems(["Producto A", "Producto B", "Producto C", "Producto D"])
         except Exception as e:
             print(f"Error cargando productos: {e}")
             self.producto_combo.addItems(["Producto A", "Producto B", "Producto C", "Producto D"])
 
-    def create_metric_card(self, title, value, color, parent_layout):
-        """Crear tarjeta de métrica"""
-        card = QWidget()
-        card.setFixedHeight(100)
-        card.setStyleSheet(f"""
-            QWidget {{
-                background-color: {color};
-                border-radius: 10px;
-                padding: 15px;
-            }}
-        """)
-        
-        card_layout = QVBoxLayout(card)
-        
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold;")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        value_label = QLabel(value)
-        value_label.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
-        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        card_layout.addWidget(title_label)
-        card_layout.addWidget(value_label)
-        
-        parent_layout.addWidget(card)
-
     def registrar_produccion(self):
-        """Registrar nueva producción"""
+        """Registrar nueva producción - VERSION CON DEBUG"""
         try:
+            producto_nombre = self.producto_combo.currentText()
+            cantidad = self.cantidad_spin.value()
+            
+            print(f"Registrando producción: {producto_nombre}, cantidad: {cantidad}")
+            
             production_data = {
-                "producto": self.producto_combo.currentText(),
-                "cantidad": self.cantidad_spin.value(),
+                "producto": producto_nombre,
+                "cantidad": cantidad,
                 "turno": self.turno_combo.currentText(),
                 "timestamp": datetime.now().isoformat(),
-                "operario": "Usuario Actual"  # Aquí deberías usar el nombre del usuario actual
+                "operario": f"{self.usuario_data.get('Nombre', '')} {self.usuario_data.get('Apellido', '')}"
             }
             
+            # 1. Registrar la producción
             response = requests.post('http://localhost:5000/register-produccion', json=production_data)
             if response.status_code == 200:
-                QMessageBox.information(self, "Éxito", "Producción registrada correctamente.")
+                print("Producción registrada exitosamente")
+                
+                # 2. Actualizar el stock (INCREMENTAR)
+                stock_actualizado = self.update_product_stock_increment(producto_nombre, cantidad)
+                
+                if stock_actualizado:
+                    mensaje = f"Producción registrada correctamente.\nStock incrementado en {cantidad} unidades."
+                else:
+                    mensaje = "Producción registrada, pero no se pudo actualizar el stock automáticamente.\nVerifica la consola para más detalles."
+                
+                QMessageBox.information(self, "Éxito", mensaje)
+                
+                # 3. Actualizar interfaz
                 self.load_production_data()
+                self.update_kpis_after_production()
             else:
-                QMessageBox.warning(self, "Error", "No se pudo registrar la producción.")
+                error_msg = f"Error {response.status_code}: {response.text}"
+                print(f"Error registrando producción: {error_msg}")
+                QMessageBox.warning(self, "Error", f"No se pudo registrar la producción.\n{error_msg}")
                 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error registrando producción: {str(e)}")
+            error_msg = f"Error registrando producción: {str(e)}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Error", error_msg)
 
     def load_production_data(self):
         """Cargar datos de producción del día"""
@@ -1313,9 +1781,203 @@ class ProductionControlPanel(QWidget):
         except Exception as e:
             print(f"Error cargando producción: {e}")
 
+    def update_product_stock_increment(self, producto_nombre, cantidad_producida):
+        """Actualizar stock incrementando por producción - VERSION CON DEBUG"""
+        try:
+            print(f"Iniciando actualización de stock para: {producto_nombre}")
+            
+            # Obtener ID del producto desde el nombre
+            producto_id = self.get_product_id_from_name(producto_nombre)
+            
+            if producto_id is None:
+                print(f"ERROR: No se pudo encontrar ID para producto: {producto_nombre}")
+                return False
+            
+            print(f"ID encontrado: {producto_id}")
+            
+            # Datos para incrementar stock
+            stock_data = {
+                'producto_id': str(producto_id),
+                'cantidad': cantidad_producida,  # Cantidad positiva
+                'operacion': 'incrementar'  # Especificar que es incremento
+            }
+            
+            print(f"Enviando datos de stock: {stock_data}")
+            
+            # Llamar al endpoint de actualización de stock
+            response = requests.post('http://localhost:5000/update-stock', json=stock_data)
+            
+            print(f"Respuesta del servidor: Status {response.status_code}")
+            print(f"Contenido de respuesta: {response.text}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"Stock actualizado: {result.get('stock_anterior', 'N/A')} -> {result.get('stock_nuevo', 'N/A')}")
+                return True
+            else:
+                print(f"Error actualizando stock: {response.status_code} - {response.text}")
+                # Intentar método alternativo
+                return self.try_alternative_stock_increment(producto_id, cantidad_producida)
+                
+        except Exception as e:
+            print(f"Error actualizando stock por producción: {e}")
+            import traceback
+            traceback.print_exc()
+        
+    def try_alternative_stock_increment(self, producto_id, cantidad):
+        """Método alternativo para incrementar stock"""
+        try:
+            # Obtener stock actual
+            response = requests.get('http://localhost:5000/get-productos')
+            if response.status_code == 200:
+                productos = response.json()
+                
+                for producto in productos:
+                    if producto.get('id') == producto_id:
+                        stock_actual = producto.get('stock_actual', 0)
+                        nuevo_stock = stock_actual + cantidad
+                        
+                        # Actualizar con stock absoluto
+                        update_data = {
+                            'stock_actual': nuevo_stock
+                        }
+                        
+                        update_response = requests.put(f'http://localhost:5000/productos/{producto_id}', json=update_data)
+                        return update_response.status_code == 200
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error en método alternativo de incremento: {e}")
+            return False
+        
+    def get_product_id_from_name(self, producto_nombre):
+        """Obtener ID del producto desde su nombre"""
+        try:
+            response = requests.get('http://localhost:5000/get-productos')
+            if response.status_code == 200:
+                productos = response.json()
+                
+                for producto in productos:
+                    nombre_producto = producto.get('nombre', '')
+                    
+                    # Verificar coincidencias (considerando formato "Nombre (ID: XXX)")
+                    if (nombre_producto in producto_nombre or 
+                        producto_nombre.startswith(nombre_producto) or
+                        nombre_producto == producto_nombre.split(' (ID:')[0]):
+                        return producto.get('id')
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error obteniendo ID del producto: {e}")
+            return None
+        
+    def update_kpis_after_production(self):
+        """Actualizar KPIs incluyendo desperdicios - VERSIÓN CORREGIDA"""
+        try:
+            # Obtener datos de producción
+            produccion_hoy = 0
+            desperdicios_hoy = 0
+            
+            # Obtener producción del día
+            try:
+                response = requests.get('http://localhost:5000/get-produccion')
+                if response.status_code == 200:
+                    produccion_data = response.json()
+                    today = datetime.now().date()
+                    
+                    for item in produccion_data:
+                        try:
+                            timestamp_str = item.get('timestamp', '')
+                            if timestamp_str:
+                                timestamp = datetime.fromisoformat(timestamp_str)
+                                item_date = timestamp.date()
+                                
+                                if item_date == today:
+                                    cantidad = item.get('cantidad', 0)
+                                    produccion_hoy += cantidad
+                        except Exception:
+                            continue
+                            
+            except Exception:
+                produccion_hoy = 0
+            
+            # Obtener desperdicios del día - NUEVO
+            try:
+                response = requests.get('http://localhost:5000/get-desperdicios')
+                if response.status_code == 200:
+                    desperdicio_data = response.json()
+                    today = datetime.now().date()
+                    
+                    for item in desperdicio_data:
+                        try:
+                            timestamp_str = item.get('timestamp', '')
+                            if timestamp_str:
+                                timestamp = datetime.fromisoformat(timestamp_str)
+                                item_date = timestamp.date()
+                                
+                                if item_date == today:
+                                    cantidad = item.get('cantidad', 0)
+                                    desperdicios_hoy += cantidad
+                        except Exception:
+                            continue
+                            
+            except Exception as e:
+                print(f"Error obteniendo desperdicios: {e}")
+                desperdicios_hoy = 0
+            
+            # Calcular eficiencia (basada en meta de 100 items por día)
+            meta_diaria = 100
+            eficiencia = min(100, (produccion_hoy / meta_diaria) * 100) if meta_diaria > 0 else 0
+            
+            # Actualizar tarjetas usando las referencias guardadas
+            if hasattr(self.produccion_card, 'value_label'):
+                self.produccion_card.value_label.setText(str(produccion_hoy))
+                print(f"Producción actualizada: {produccion_hoy}")
+            
+            if hasattr(self.eficiencia_card, 'value_label'):
+                self.eficiencia_card.value_label.setText(f"{eficiencia:.1f}%")
+                print(f"Eficiencia actualizada: {eficiencia:.1f}%")
+                
+            if hasattr(self.defectos_card, 'value_label'):
+                self.defectos_card.value_label.setText(str(desperdicios_hoy))
+                print(f"Desperdicios actualizado: {desperdicios_hoy}")
+            
+            # Forzar actualización visual
+            self.produccion_card.repaint()
+            self.eficiencia_card.repaint()
+            self.defectos_card.repaint()
+        
+        except Exception as e:
+            print(f"Error actualizando KPIs: {e}")
+            # En caso de error, mostrar valores por defecto
+            if hasattr(self.produccion_card, 'value_label'):
+                self.produccion_card.value_label.setText("Error")
+            if hasattr(self.eficiencia_card, 'value_label'):
+                self.eficiencia_card.value_label.setText("Error")  
+            if hasattr(self.defectos_card, 'value_label'):
+                self.defectos_card.value_label.setText("0")
+
+    def notify_production_panel_update(self):
+        """Notificar al panel de producción para actualizar KPIs"""
+        try:
+            # Buscar el panel de producción en la ventana padre
+            parent_window = self.parent()
+            while parent_window and not hasattr(parent_window, 'production_panel'):
+                parent_window = parent_window.parent()
+            
+            if parent_window and hasattr(parent_window, 'production_panel'):
+                # Actualizar KPIs del panel de producción
+                parent_window.production_panel.update_kpis_after_production()
+                print("KPIs del panel de producción actualizados")
+        except Exception as e:
+            print(f"Error notificando al panel de producción: {e}")
+    
 class InventoryPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, usuario_data=None, parent=None):
         super().__init__(parent)
+        self.usuario_data = usuario_data or {}
         self.setup_ui()
         self.load_inventory()
 
@@ -1328,7 +1990,69 @@ class InventoryPanel(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
+        # Formulario para registrar desperdicio
+        desperdicio_section = QLabel("Registrar Desperdicio")
+        desperdicio_section.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0;")
+        layout.addWidget(desperdicio_section)
+
+        desperdicio_layout = QFormLayout()
+        
+        self.desperdicio_producto_combo = QComboBox()
+        self.load_products_for_desperdicio()
+        
+        self.desperdicio_cantidad_spin = QSpinBox()
+        self.desperdicio_cantidad_spin.setRange(1, 9999)
+        self.desperdicio_cantidad_spin.setValue(1)
+        
+        self.motivo_combo = QComboBox()
+        self.motivo_combo.addItems([
+            "Material Defectuoso", "Error de Proceso", "Daño en Transporte",
+            "Caducidad", "Falla de Equipo", "Error Humano", "Otro"
+        ])
+        
+        self.descripcion_desperdicio = QLineEdit()
+        self.descripcion_desperdicio.setPlaceholderText("Descripción opcional del motivo...")
+        
+        # Estilos para formulario de desperdicio
+        form_style = """
+            QComboBox, QSpinBox, QLineEdit {
+                padding: 8px;
+                border: 2px solid #bdc3c7;
+                border-radius: 5px;
+                font-size: 14px;
+                min-width: 200px;
+            }
+            QComboBox:focus, QSpinBox:focus, QLineEdit:focus {
+                border-color: #e74c3c;
+            }
+        """
+        self.desperdicio_producto_combo.setStyleSheet(form_style)
+        self.desperdicio_cantidad_spin.setStyleSheet(form_style)
+        self.motivo_combo.setStyleSheet(form_style)
+        self.descripcion_desperdicio.setStyleSheet(form_style)
+
+        desperdicio_layout.addRow("Producto:", self.desperdicio_producto_combo)
+        desperdicio_layout.addRow("Cantidad:", self.desperdicio_cantidad_spin)
+        desperdicio_layout.addRow("Motivo:", self.motivo_combo)
+        desperdicio_layout.addRow("Descripción:", self.descripcion_desperdicio)
+
+        self.btn_registrar_desperdicio = ModernButton("Registrar Desperdicio", "danger")
+        self.btn_registrar_desperdicio.clicked.connect(self.registrar_desperdicio)
+
+        layout.addLayout(desperdicio_layout)
+        layout.addWidget(self.btn_registrar_desperdicio)
+
+        # Separador visual
+        separator = QLabel()
+        separator.setFixedHeight(2)
+        separator.setStyleSheet("background-color: #bdc3c7; margin: 20px 0;")
+        layout.addWidget(separator)
+
         # Tabla de inventario
+        inventory_title = QLabel("Estado del Inventario")
+        inventory_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin: 10px 0;")
+        layout.addWidget(inventory_title)
+
         self.inventory_table = QTableWidget()
         self.inventory_table.setColumnCount(5)
         self.inventory_table.setHorizontalHeaderLabels([
@@ -1339,23 +2063,269 @@ class InventoryPanel(QWidget):
         
         layout.addWidget(self.inventory_table)
 
-        # Botones de acción
+        # Botón unificado
         btn_layout = QHBoxLayout()
-        self.btn_update_stock = ModernButton("Actualizar Stock", "primary")
-        self.btn_add_product = ModernButton("Agregar Producto", "success")
-        self.btn_refresh = ModernButton("Actualizar", "secondary")
+        self.btn_actualizar = ModernButton("Actualizar", "primary")
+        self.btn_actualizar.clicked.connect(self.actualizar_todo)
         
-        btn_layout.addWidget(self.btn_update_stock)
-        btn_layout.addWidget(self.btn_add_product)
-        btn_layout.addWidget(self.btn_refresh)
+        btn_layout.addWidget(self.btn_actualizar)
         btn_layout.addStretch()
         
         layout.addLayout(btn_layout)
-
-        # Conectar botones
-        self.btn_refresh.clicked.connect(self.load_inventory)
-        
         self.setLayout(layout)
+
+    def registrar_desperdicio(self):
+        """Registrar desperdicio y actualizar stock - VERSIÓN CORREGIDA"""
+        try:
+            producto_nombre = self.desperdicio_producto_combo.currentText()
+            cantidad = self.desperdicio_cantidad_spin.value()
+            
+            if not producto_nombre.strip():
+                QMessageBox.warning(self, "Error", "Seleccione un producto válido.")
+                return
+            
+            if cantidad <= 0:
+                QMessageBox.warning(self, "Error", "La cantidad debe ser mayor a 0.")
+                return
+            
+            # Obtener ID del producto
+            producto_id = self.get_product_id_from_name(producto_nombre)
+            
+            # Datos del desperdicio para registro
+            desperdicio_data = {
+                'producto': producto_nombre,
+                'producto_id': str(producto_id) if producto_id else '',
+                'cantidad': cantidad,
+                'motivo': self.motivo_combo.currentText(),
+                'descripcion': self.descripcion_desperdicio.text().strip(),
+                'timestamp': datetime.now().isoformat(),
+                'operario': f"{self.usuario_data.get('Nombre', '')} {self.usuario_data.get('Apellido', '')}",
+                'tipo': 'desperdicio'
+            }
+            
+            # 1. Registrar el desperdicio
+            response = requests.post('http://localhost:5000/register-desperdicio', json=desperdicio_data)
+            
+            if response.status_code == 200:
+                # 2. Actualizar stock (REDUCIR)
+                if producto_id:
+                    stock_actualizado = self.update_stock_por_desperdicio(producto_id, cantidad)
+                else:
+                    stock_actualizado = False
+                
+                # 3. Limpiar formulario
+                self.desperdicio_cantidad_spin.setValue(1)
+                self.descripcion_desperdicio.clear()
+                
+                # 4. Actualizar inventario
+                self.load_inventory()
+                
+                # 5. Mostrar mensaje
+                if stock_actualizado:
+                    mensaje = f"Desperdicio registrado correctamente.\nStock reducido en {cantidad} unidades."
+                else:
+                    mensaje = "Desperdicio registrado, pero no se pudo actualizar el stock automáticamente."
+                
+                QMessageBox.information(self, "Éxito", mensaje)
+            else:
+                # Si falla el registro, mostrar error específico
+                try:
+                    error_response = response.json()
+                    error_message = error_response.get('error', 'Error desconocido')
+                except:
+                    error_message = f"Error HTTP {response.status_code}"
+                
+                QMessageBox.warning(self, "Error", f"No se pudo registrar el desperdicio:\n{error_message}")
+                    
+        except requests.exceptions.ConnectionError:
+            QMessageBox.critical(self, "Error de Conexión", 
+                "No se puede conectar con el servidor.\n"
+                "Verifique que el servidor esté ejecutándose en http://localhost:5000")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al registrar desperdicio: {str(e)}")
+
+    def update_stock_por_desperdicio(self, producto_id, cantidad_desperdiciada):
+        """Actualizar stock reduciendo por desperdicio - VERSIÓN CORREGIDA"""
+        try:
+            # Datos para reducir stock
+            stock_data = {
+                'producto_id': str(producto_id),
+                'cantidad': cantidad_desperdiciada,  # Cantidad positiva
+                'operacion': 'decrementar'  # Especificar que es para REDUCIR
+            }
+            
+            response = requests.post('http://localhost:5000/update-stock', json=stock_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"Stock reducido: {result.get('stock_anterior', 'N/A')} -> {result.get('stock_nuevo', 'N/A')}")
+                return True
+            else:
+                print(f"Error reduciendo stock: {response.status_code}")
+                # Intentar método alternativo
+                return self.try_alternative_stock_reduction(producto_id, cantidad_desperdiciada)
+                    
+        except Exception as e:
+            print(f"Error actualizando stock por desperdicio: {e}")
+            return self.try_alternative_stock_reduction(producto_id, cantidad_desperdiciada)
+
+    def get_product_id_from_name(self, producto_nombre):
+        """Obtener ID del producto desde su nombre"""
+        try:
+            response = requests.get('http://localhost:5000/get-productos')
+            if response.status_code == 200:
+                productos = response.json()
+                
+                for producto in productos:
+                    nombre_producto = producto.get('nombre', '')
+                    
+                    # Verificar coincidencias
+                    if (nombre_producto == producto_nombre or 
+                        producto_nombre.startswith(nombre_producto) or
+                        nombre_producto in producto_nombre):
+                        return producto.get('id')
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error obteniendo ID del producto: {e}")
+            return None
+
+    def try_alternative_stock_reduction(self, producto_id, cantidad):
+        """Método alternativo para reducir stock"""
+        try:
+            # Obtener stock actual primero
+            response = requests.get('http://localhost:5000/get-productos')
+            if response.status_code == 200:
+                productos = response.json()
+                
+                for producto in productos:
+                    if producto.get('id') == producto_id:
+                        stock_actual = producto.get('stock_actual', 0)
+                        nuevo_stock = max(0, stock_actual - cantidad)  # No permitir stock negativo
+                        
+                        # Actualizar con stock absoluto
+                        update_data = {
+                            'stock_actual': nuevo_stock
+                        }
+                        
+                        update_response = requests.put(f'http://localhost:5000/productos/{producto_id}', json=update_data)
+                        
+                        if update_response.status_code == 200:
+                            print(f"Stock actualizado por método alternativo: {stock_actual} -> {nuevo_stock}")
+                            return True
+                        break
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error en método alternativo de reducción: {e}")
+            return False
+
+    def load_products_for_desperdicio(self):
+        """Cargar productos en el combo de desperdicios - VERSIÓN MEJORADA"""
+        try:
+            response = requests.get('http://localhost:5000/get-productos')
+            if response.status_code == 200:
+                productos = response.json()
+                self.desperdicio_producto_combo.clear()
+                
+                for producto in productos:
+                    producto_id = producto.get('id', '')
+                    nombre = producto.get('nombre', f"Producto {producto_id}")
+                    
+                    # Añadir producto al combo con ID como userData
+                    self.desperdicio_producto_combo.addItem(nombre, producto_id)
+                
+                print(f"Cargados {len(productos)} productos para desperdicio")
+            else:
+                print(f"Error cargando productos: {response.status_code}")
+                self.load_default_products_desperdicio()
+                
+        except requests.exceptions.ConnectionError:
+            print("Error de conexión cargando productos, usando valores por defecto")
+            self.load_default_products_desperdicio()
+        except Exception as e:
+            print(f"Error cargando productos para desperdicio: {e}")
+            self.load_default_products_desperdicio()
+
+    def load_default_products_desperdicio(self):
+        """Productos por defecto para desperdicios cuando falla la API"""
+        self.desperdicio_producto_combo.clear()
+        default_products = [
+            ("Producto A", 1),
+            ("Producto B", 2), 
+            ("Producto C", 3),
+            ("Producto D", 4)
+        ]
+        
+        for nombre, producto_id in default_products:
+            self.desperdicio_producto_combo.addItem(nombre, producto_id)
+
+    def actualizar_todo(self):
+        """Actualizar inventario y stock basado en producciones registradas"""
+        try:
+            # Primero, sincronizar stock con producciones
+            self.sincronizar_stock_con_produccion()
+            
+            # Luego recargar el inventario
+            self.load_inventory()
+            
+            # Recargar productos en combos
+            self.load_products_for_desperdicio()
+            
+            QMessageBox.information(self, "Actualización", 
+                "Inventario actualizado correctamente.\n"
+                "Stock sincronizado con producción registrada.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error actualizando: {str(e)}")
+
+    def sincronizar_stock_con_produccion(self):
+        """Sincronizar stock con todas las producciones registradas"""
+        try:
+            # Obtener todas las producciones
+            response = requests.get('http://localhost:5000/get-produccion')
+            if response.status_code == 200:
+                producciones = response.json()
+                
+                # Agrupar por producto
+                produccion_por_producto = defaultdict(int)
+                
+                for prod in producciones:
+                    producto_nombre = prod.get('producto', '')
+                    cantidad = prod.get('cantidad', 0)
+                    produccion_por_producto[producto_nombre] += cantidad
+                
+                # Actualizar stock para cada producto
+                for producto_nombre, cantidad_total in produccion_por_producto.items():
+                    self.update_stock_by_name(producto_nombre, cantidad_total)
+                    
+            print("Stock sincronizado con producciones")
+            
+        except Exception as e:
+            print(f"Error sincronizando stock: {e}")
+
+    def update_stock_by_name(self, producto_nombre, cantidad_total):
+        """Actualizar stock de un producto por nombre"""
+        try:
+            # Obtener ID del producto por nombre
+            response = requests.get('http://localhost:5000/get-productos')
+            if response.status_code == 200:
+                productos = response.json()
+                for producto in productos:
+                    if producto.get('nombre') == producto_nombre:
+                        producto_id = producto.get('id')
+                        
+                        # Actualizar stock con la cantidad total producida
+                        stock_data = {
+                            'producto_id': producto_id,
+                            'cantidad_total': cantidad_total  # Establecer cantidad total
+                        }
+                        requests.post('http://localhost:5000/set-stock-total', json=stock_data)
+                        break
+        except Exception as e:
+            print(f"Error actualizando stock para {producto_nombre}: {e}")
 
     def load_inventory(self):
         """Cargar inventario desde la API"""
@@ -1570,15 +2540,31 @@ class MyAttendancePanel(QWidget):
 
         # Tarjetas de resumen
         summary_layout = QHBoxLayout()
-        self.checkin_card = self.create_summary_card("Check-In", "No registrado", "#3498db")
-        self.checkout_card = self.create_summary_card("Check-Out", "No registrado", "#e74c3c")
-        self.horas_card = self.create_summary_card("Horas Trabajadas", "0:00", "#27ae60")
+        self.checkins_card = self.create_summary_card("Check-Ins", "0", "#3498db")
+        self.checkouts_card = self.create_summary_card("Check-Outs", "0", "#e74c3c")
+        self.horas_card = self.create_summary_card("Total Horas", "0:00", "#27ae60")
         
-        summary_layout.addWidget(self.checkin_card)
-        summary_layout.addWidget(self.checkout_card)
+        summary_layout.addWidget(self.checkins_card)
+        summary_layout.addWidget(self.checkouts_card)
         summary_layout.addWidget(self.horas_card)
         
         layout.addLayout(summary_layout)
+
+        # Tabla de eventos de hoy
+        today_events_title = QLabel("Eventos de Hoy")
+        today_events_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0;")
+        layout.addWidget(today_events_title)
+
+        self.today_events_table = QTableWidget()
+        self.today_events_table.setColumnCount(4)
+        self.today_events_table.setHorizontalHeaderLabels([
+            "Hora", "Tipo", "Duración Desde Anterior", "Acumulado"
+        ])
+        header = self.today_events_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.today_events_table.setMaximumHeight(300)
+        
+        layout.addWidget(self.today_events_table)
 
         # Historial de asistencia
         history_title = QLabel("Historial de Asistencia (Últimos 7 días)")
@@ -1588,7 +2574,7 @@ class MyAttendancePanel(QWidget):
         self.attendance_table = QTableWidget()
         self.attendance_table.setColumnCount(4)
         self.attendance_table.setHorizontalHeaderLabels([
-            "Fecha", "Check-In", "Check-Out", "Horas"
+            "Fecha", "Check-Ins", "Check-Outs", "Total Horas"
         ])
         header = self.attendance_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -1597,8 +2583,6 @@ class MyAttendancePanel(QWidget):
         self.setLayout(layout)
 
     def create_summary_card(self, title, value, color):
-        # role_based_windows2.py - Continuación del código completado
-
         """Crear tarjeta de resumen"""
         card = QWidget()
         card.setFixedHeight(80)
@@ -1606,7 +2590,7 @@ class MyAttendancePanel(QWidget):
             QWidget {{
                 background-color: {color};
                 border-radius: 10px;
-                padding: 10px;
+                padding: 5px;
             }}
         """)
         
@@ -1620,27 +2604,105 @@ class MyAttendancePanel(QWidget):
         value_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold;")
         value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
+        # Guardar referencia al value_label para poder actualizarlo
+        card.value_label = value_label
+        
         layout.addWidget(title_label)
         layout.addWidget(value_label)
         
         return card
 
+    def calculate_time_difference(self, time1, time2):
+        """Calcular diferencia entre dos timestamps y devolver en formato legible"""
+        try:
+            if isinstance(time1, str):
+                time1 = datetime.fromisoformat(time1)
+            if isinstance(time2, str):
+                time2 = datetime.fromisoformat(time2)
+            
+            diff = abs(time2 - time1)
+            total_seconds = diff.total_seconds()
+            hours = int(total_seconds // 3600)
+            minutes = int((total_seconds % 3600) // 60)
+            
+            if hours > 0:
+                return f"{hours}h {minutes}m"
+            else:
+                return f"{minutes}m"
+        except:
+            return "N/A"
+
+    def calculate_total_work_time(self, eventos_del_dia):
+        """Calcular tiempo total trabajado basado en pares CheckIn-CheckOut"""
+        try:
+            # Separar eventos por tipo y ordenar por tiempo
+            checkins = []
+            checkouts = []
+            
+            for evento in eventos_del_dia:
+                timestamp_str = evento.get('timestamp', '')
+                if not timestamp_str:
+                    continue
+                    
+                timestamp = datetime.fromisoformat(timestamp_str)
+                evento_tipo = evento.get("evento")
+                
+                if evento_tipo == "CheckIn":
+                    checkins.append(timestamp)
+                elif evento_tipo == "CheckOut":
+                    checkouts.append(timestamp)
+            
+            checkins.sort()
+            checkouts.sort()
+            
+            # Emparejar CheckIns con CheckOuts
+            total_seconds = 0
+            i = 0
+            
+            for checkin in checkins:
+                # Buscar el siguiente checkout después de este checkin
+                checkout_found = None
+                for j in range(i, len(checkouts)):
+                    if checkouts[j] > checkin:
+                        checkout_found = checkouts[j]
+                        i = j + 1
+                        break
+                
+                if checkout_found:
+                    work_session = checkout_found - checkin
+                    if work_session.total_seconds() > 0:  # Solo sesiones positivas
+                        total_seconds += work_session.total_seconds()
+            
+            # Convertir a formato legible
+            total_hours = total_seconds / 3600
+            hours = int(total_hours)
+            minutes = int((total_hours % 1) * 60)
+            
+            return f"{hours}:{minutes:02d}"
+            
+        except Exception as e:
+            print(f"Error calculando tiempo total: {e}")
+            return "0:00"
+
     def load_my_attendance(self):
-        """Cargar asistencia del usuario actual"""
+        """Cargar asistencia del usuario actual mostrando TODOS los eventos"""
         try:
             empleado_id = self.usuario_data.get("EmpleadoID")
+            print(f"Cargando asistencia completa para empleado ID: {empleado_id}")
             
             # Cargar eventos del empleado actual
             response = requests.get('http://localhost:5000/get-eventos')
             if response.status_code == 200:
                 eventos = response.json()
+                print(f"Total eventos obtenidos: {len(eventos)}")
                 
                 # Filtrar eventos del usuario actual
                 my_eventos = [e for e in eventos if e.get("EmpleadoID") == empleado_id]
+                print(f"Eventos del usuario: {len(my_eventos)}")
                 
-                # Procesar eventos por día
+                # Agrupar eventos por día
                 from datetime import timedelta
-                daily_attendance = defaultdict(lambda: {"checkin": None, "checkout": None})
+                eventos_por_dia = defaultdict(list)
                 
                 # Obtener últimos 7 días
                 end_date = date.today()
@@ -1648,73 +2710,159 @@ class MyAttendancePanel(QWidget):
                 
                 for evento in my_eventos:
                     try:
-                        timestamp = datetime.fromisoformat(evento.get('timestamp', ''))
+                        timestamp_str = evento.get('timestamp', '')
+                        if not timestamp_str:
+                            continue
+                            
+                        timestamp = datetime.fromisoformat(timestamp_str)
                         day_key = timestamp.date().isoformat()
                         
                         # Solo procesar eventos de los últimos 7 días
                         if start_date <= timestamp.date() <= end_date:
-                            if evento.get("evento") == "CheckIn":
-                                daily_attendance[day_key]["checkin"] = timestamp
-                            elif evento.get("evento") == "CheckOut":
-                                daily_attendance[day_key]["checkout"] = timestamp
-                    except:
+                            eventos_por_dia[day_key].append(evento)
+                            
+                    except Exception as e:
+                        print(f"Error procesando evento: {e}")
                         continue
                 
-                # Actualizar tarjetas de resumen para hoy
+                print(f"Días con eventos: {len(eventos_por_dia)}")
+                
+                # Procesar eventos de hoy
                 today_key = date.today().isoformat()
-                if today_key in daily_attendance:
-                    today_data = daily_attendance[today_key]
-                    
-                    if today_data["checkin"]:
-                        checkin_time = today_data["checkin"].strftime('%H:%M')
-                        self.update_card(self.checkin_card, "Check-In", checkin_time, "#27ae60")
-                        
-                    if today_data["checkout"]:
-                        checkout_time = today_data["checkout"].strftime('%H:%M')
-                        self.update_card(self.checkout_card, "Check-Out", checkout_time, "#27ae60")
-                        
-                        if today_data["checkin"]:
-                            # Calcular horas trabajadas
-                            worked_hours = today_data["checkout"] - today_data["checkin"]
-                            hours = worked_hours.total_seconds() / 3600
-                            formatted_hours = f"{int(hours)}:{int((hours % 1) * 60):02d}"
-                            self.update_card(self.horas_card, "Horas Trabajadas", formatted_hours, "#27ae60")
+                if today_key in eventos_por_dia:
+                    self.load_today_events(eventos_por_dia[today_key])
                 
                 # Llenar tabla de historial
-                sorted_days = sorted(daily_attendance.keys(), reverse=True)
-                self.attendance_table.setRowCount(len(sorted_days))
-                
-                for row, day_key in enumerate(sorted_days):
-                    day_data = daily_attendance[day_key]
+                self.load_history_table(eventos_por_dia)
+                        
+        except Exception as e:
+            print(f"Error cargando asistencia personal: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def load_today_events(self, eventos_hoy):
+        """Cargar y mostrar todos los eventos de hoy"""
+        try:
+            # Ordenar eventos por timestamp
+            eventos_ordenados = sorted(eventos_hoy, 
+                key=lambda x: datetime.fromisoformat(x.get('timestamp', '1900-01-01T00:00:00')))
+            
+            print(f"Procesando {len(eventos_ordenados)} eventos de hoy")
+            
+            # Contar check-ins y check-outs
+            checkins_count = sum(1 for e in eventos_ordenados if e.get("evento") == "CheckIn")
+            checkouts_count = sum(1 for e in eventos_ordenados if e.get("evento") == "CheckOut")
+            
+            # Actualizar tarjetas de resumen
+            self.checkins_card.value_label.setText(str(checkins_count))
+            self.checkouts_card.value_label.setText(str(checkouts_count))
+            
+            # Calcular tiempo total trabajado
+            total_time = self.calculate_total_work_time(eventos_ordenados)
+            self.horas_card.value_label.setText(total_time)
+            
+            # Llenar tabla de eventos de hoy
+            self.today_events_table.setRowCount(len(eventos_ordenados))
+            
+            tiempo_acumulado = 0
+            evento_anterior = None
+            
+            for row, evento in enumerate(eventos_ordenados):
+                try:
+                    timestamp = datetime.fromisoformat(evento.get('timestamp', ''))
+                    hora = timestamp.strftime('%H:%M:%S')
+                    tipo = evento.get("evento")
                     
-                    # Formatear fecha
-                    try:
-                        day_date = datetime.fromisoformat(day_key).strftime('%d/%m/%Y')
-                    except:
-                        day_date = day_key
+                    # Calcular duración desde evento anterior
+                    duracion_str = "-"
+                    if evento_anterior:
+                        duracion_str = self.calculate_time_difference(
+                            evento_anterior.get('timestamp'), 
+                            evento.get('timestamp')
+                        )
                     
-                    # Formatear check-in
-                    checkin_str = day_data["checkin"].strftime('%H:%M') if day_data["checkin"] else "-"
+                    # Calcular tiempo acumulado (solo para CheckOuts)
+                    acumulado_str = "-"
+                    if tipo == "CheckOut" and evento_anterior and evento_anterior.get("evento") == "CheckIn":
+                        try:
+                            checkin_time = datetime.fromisoformat(evento_anterior.get('timestamp'))
+                            checkout_time = timestamp
+                            session_time = (checkout_time - checkin_time).total_seconds()
+                            if session_time > 0:
+                                tiempo_acumulado += session_time
+                                hours = int(tiempo_acumulado // 3600)
+                                minutes = int((tiempo_acumulado % 3600) // 60)
+                                acumulado_str = f"{hours}:{minutes:02d}"
+                        except:
+                            pass
                     
-                    # Formatear check-out
-                    checkout_str = day_data["checkout"].strftime('%H:%M') if day_data["checkout"] else "-"
-                    
-                    # Calcular horas
-                    hours_str = "-"
-                    if day_data["checkin"] and day_data["checkout"]:
-                        worked_hours = day_data["checkout"] - day_data["checkin"]
-                        hours = worked_hours.total_seconds() / 3600
-                        hours_str = f"{int(hours)}:{int((hours % 1) * 60):02d}"
-                    
-                    items = [day_date, checkin_str, checkout_str, hours_str]
+                    items = [hora, tipo, duracion_str, acumulado_str]
                     
                     for col, text in enumerate(items):
                         item = QTableWidgetItem(text)
                         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                        self.attendance_table.setItem(row, col, item)
                         
+                        # Colorear según el tipo
+                        if col == 1:  # Columna tipo
+                            if "CheckIn" in text:
+                                item.setBackground(Qt.GlobalColor.green)
+                                item.setForeground(Qt.GlobalColor.white)
+                            elif "CheckOut" in text:
+                                item.setBackground(Qt.GlobalColor.red)
+                                item.setForeground(Qt.GlobalColor.white)
+                        
+                        self.today_events_table.setItem(row, col, item)
+                    
+                    evento_anterior = evento
+                    
+                except Exception as e:
+                    print(f"Error procesando evento en fila {row}: {e}")
+                    continue
+                    
+            print(f"Tabla de eventos de hoy completada: {checkins_count} CheckIns, {checkouts_count} CheckOuts")
+            
         except Exception as e:
-            print(f"Error cargando asistencia personal: {e}")
+            print(f"Error cargando eventos de hoy: {e}")
+
+    def load_history_table(self, eventos_por_dia):
+        """Cargar tabla de historial con resumen por día"""
+        try:
+            # Ordenar días de más reciente a más antiguo
+            sorted_days = sorted(eventos_por_dia.keys(), reverse=True)
+            self.attendance_table.setRowCount(len(sorted_days))
+            
+            for row, day_key in enumerate(sorted_days):
+                eventos_del_dia = eventos_por_dia[day_key]
+                
+                # Formatear fecha
+                try:
+                    day_date = datetime.fromisoformat(day_key).strftime('%d/%m/%Y')
+                except:
+                    day_date = day_key
+                
+                # Contar eventos
+                checkins = sum(1 for e in eventos_del_dia if e.get("evento") == "CheckIn")
+                checkouts = sum(1 for e in eventos_del_dia if e.get("evento") == "CheckOut")
+                
+                # Calcular tiempo total
+                total_time = self.calculate_total_work_time(eventos_del_dia)
+                
+                items = [day_date, f"{checkins}", f"{checkouts}", total_time]
+                
+                for col, text in enumerate(items):
+                    item = QTableWidgetItem(text)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    
+                    # Resaltar el día actual
+                    if day_key == date.today().isoformat():
+                        item.setBackground(Qt.GlobalColor.lightGray)
+                    
+                    self.attendance_table.setItem(row, col, item)
+                    
+            print("Tabla de historial completada")
+            
+        except Exception as e:
+            print(f"Error cargando tabla de historial: {e}")
 
     def update_card(self, card, title, value, color):
         """Actualizar el contenido de una tarjeta"""
@@ -1722,29 +2870,13 @@ class MyAttendancePanel(QWidget):
             QWidget {{
                 background-color: {color};
                 border-radius: 10px;
-                padding: 10px;
+                padding: 5px;
             }}
         """)
         
-        # Buscar y actualizar el label del valor
-        for child in card.findChildren(QLabel):
-            if child.font().pointSize() > 12:  # Es el label del valor
-                child.setText(value)
-            elif title in ["Check-In", "Check-Out", "Horas Trabajadas"]:
-                if "Check-In" in child.text() or "Check-Out" in child.text() or "Horas Trabajadas" in child.text():
-                    # Actualizar layout completo
-                    layout = card.layout()
-                    for i in range(layout.count()):
-                        widget = layout.itemAt(i).widget()
-                        if isinstance(widget, QLabel):
-                            if "Check-In" in widget.text() and "Check-In" in title:
-                                continue
-                            elif "Check-Out" in widget.text() and "Check-Out" in title:
-                                continue
-                            elif "Horas" in widget.text() and "Horas" in title:
-                                continue
-                            else:
-                                widget.setText(value)
+        # Actualizar usando la referencia guardada
+        if hasattr(card, 'value_label'):
+            card.value_label.setText(value)
 
 # -----------------------------
 # FUNCIONES AUXILIARES PARA LA API
