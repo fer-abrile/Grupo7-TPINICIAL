@@ -62,11 +62,6 @@ class MainWindow(QMainWindow):
         # ---------------- Contenido
         self.content_area = QStackedWidget()
 
-        self.content_area.addWidget(self.welcome_panel)     # 0
-        self.content_area.addWidget(self.graphics_panel)    # 1
-        self.content_area.addWidget(self.employee_panel)    # 2
-        self.content_area.addWidget(self.multi_charts_panel) # 3
-
         self.content_area.setCurrentIndex(0)
 
         main_layout.addWidget(sidebar)

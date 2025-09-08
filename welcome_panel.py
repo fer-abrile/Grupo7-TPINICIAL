@@ -1,19 +1,7 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QLabel, QVBoxLayout, QWidget, QPushButton,
-    QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView,
-    QHBoxLayout, QStackedWidget, QFrame, QTextEdit, QFormLayout,
-    QLineEdit, QComboBox, QSpinBox, QDialog, QDialogButtonBox
+    QLabel, QVBoxLayout, QWidget
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCloseEvent
-from datetime import datetime, date, timedelta
-from collections import defaultdict
-from modern_components import ModernButton, ModernLineEdit
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-import requests
-import json
 
 class WelcomePanel(QWidget):
     def __init__(self, usuario_data, role_specific_message="", parent=None):

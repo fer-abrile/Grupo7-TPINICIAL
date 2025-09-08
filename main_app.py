@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMainWindow
 from login_window import LoginWindow
 from main_window import MainWindow
 from roled_based_windows import WindowFactory
