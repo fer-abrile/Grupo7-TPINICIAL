@@ -44,7 +44,10 @@ class MainApp(QMainWindow):
     def cerrar_ventana_actual(self):
         """Cerrar la ventana actual del usuario"""
         if self.current_user_window:
-            self.current_user_window.close()
+            try:
+                self.current_user_window.close()
+            except RuntimeError:
+                pass  # La ventana ya fue eliminada
             self.current_user_window = None
             self.usuario_data = None
 

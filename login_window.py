@@ -262,22 +262,23 @@ class LoginWindow(QMainWindow):
         self.move(x, y)
     
     def setup_ui(self):
+        from PyQt6.QtWidgets import QCheckBox
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(75, 50, 75, 50)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         self.login_card = AnimatedCard()
         card_layout = QVBoxLayout()
         card_layout.setContentsMargins(40, 40, 40, 40)
         card_layout.setSpacing(25)
-        
+
         title_layout = QVBoxLayout()
         title_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_layout.setSpacing(10)
-        
+
         main_title = QLabel("Sistema de Gestión")
         main_title.setStyleSheet("""
             QLabel {
@@ -288,7 +289,7 @@ class LoginWindow(QMainWindow):
             }
         """)
         main_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         subtitle = QLabel("Inicia sesión para continuar")
         subtitle.setStyleSheet("""
             QLabel {
@@ -298,32 +299,38 @@ class LoginWindow(QMainWindow):
             }
         """)
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         title_layout.addWidget(main_title)
         title_layout.addWidget(subtitle)
-        
+
         self.username_edit = ModernLineEdit("Usuario")
         self.username_edit.setFixedHeight(50)
-        
+
         self.password_edit = ModernLineEdit("Contraseña")
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_edit.setFixedHeight(50)
         self.password_edit.returnPressed.connect(self.login)
-        
+
+    # Checkbox para usar cámara
+
+        self.use_camera_checkbox = QCheckBox("Iniciar sesión sin cámara")
+        self.use_camera_checkbox.setChecked(True)
+        self.use_camera_checkbox.setStyleSheet("font-size: 14px; color: #34495e; margin-bottom: 10px;")
+
         button_layout = QVBoxLayout()
         button_layout.setSpacing(15)
-        
+
         self.login_button = ModernButton("Iniciar Sesión", "primary")
         self.login_button.setFixedHeight(50)
         self.login_button.clicked.connect(self.login)
-        
+
         self.register_button = ModernButton("Registrar Empleado", "success")
         self.register_button.setFixedHeight(45)
         self.register_button.clicked.connect(self.show_register)
-        
+
         button_layout.addWidget(self.login_button)
         button_layout.addWidget(self.register_button)
-        
+
         self.status_label = QLabel("")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("""
@@ -334,16 +341,17 @@ class LoginWindow(QMainWindow):
                 padding: 10px;
             }
         """)
-        
+
         card_layout.addLayout(title_layout)
         card_layout.addWidget(self.username_edit)
         card_layout.addWidget(self.password_edit)
+        card_layout.addWidget(self.use_camera_checkbox)
         card_layout.addLayout(button_layout)
         card_layout.addWidget(self.status_label)
-        
+
         self.login_card.setLayout(card_layout)
         main_layout.addWidget(self.login_card)
-        
+
         central_widget.setLayout(main_layout)
     
     def show_message(self, message, color="#e74c3c"):
@@ -407,6 +415,16 @@ class LoginWindow(QMainWindow):
             # Para empleados permanentes: verificar face_embedding
             if 'face_embedding' not in usuario or not usuario['face_embedding']:
                 self.show_message("El usuario no tiene rostro registrado.")
+                return
+
+            # Si el usuario eligió NO usar la cámara, omitir verificación facial
+            if self.use_camera_checkbox.isChecked():
+                self.show_message(
+                    f"¡Bienvenido {usuario['Nombre']} {usuario['Apellido']}! (Sin verificación facial)",
+                    "#27ae60"
+                )
+                self.registrar_checkin(usuario)
+                self.login_successful.emit(usuario)
                 return
 
             # Proceder con verificación facial para empleados permanentes
