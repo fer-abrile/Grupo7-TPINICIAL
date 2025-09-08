@@ -386,14 +386,30 @@ class LoginWindow(QMainWindow):
                     self.show_register()
                 return
 
+            # Verificar contraseña
             if password != usuario.get('password', ''):
                 self.show_message("Contraseña incorrecta")
                 return
 
+            # Verificar si es empleado temporal
+            is_temporal = usuario.get('temporal', False)
+            
+            if is_temporal:
+                # Para empleados temporales: login directo sin verificación facial
+                self.show_message(
+                    f"¡Bienvenido {usuario['Nombre']} {usuario['Apellido']} (Temporal)!", 
+                    "#27ae60"
+                )
+                self.registrar_checkin(usuario)
+                self.login_successful.emit(usuario)
+                return
+            
+            # Para empleados permanentes: verificar face_embedding
             if 'face_embedding' not in usuario or not usuario['face_embedding']:
                 self.show_message("El usuario no tiene rostro registrado.")
                 return
 
+            # Proceder con verificación facial para empleados permanentes
             known_embedding = np.array(usuario['face_embedding'])
             verification_dialog = FacialVerificationDialog(
                 self, 
@@ -411,6 +427,7 @@ class LoginWindow(QMainWindow):
                 return
             else:
                 self.show_message("Verificación facial cancelada o fallida.")
+                
         except Exception as e:
             self.show_message(f"Error durante la verificación: {str(e)}")
         finally:
