@@ -608,7 +608,7 @@ class RegisterDialog(QDialog):
         }
         
         try:
-            response = requests.post('http://localhost:5000/register-empleado', json=datos_usuario)
+            response = requests.post('https://grupo7-tpinicial.onrender.com/register-empleado', json=datos_usuario)
             if response.status_code == 200:
                 QMessageBox.information(self, "Éxito", 
                     f"Empleado registrado exitosamente.\nEmpleadoID: {empleado_id}\nUsername: {username}\nContraseña: 12345")

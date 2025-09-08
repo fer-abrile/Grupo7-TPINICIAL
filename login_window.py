@@ -443,7 +443,7 @@ class LoginWindow(QMainWindow):
         }
         try:
             response = requests.post(
-                "http://localhost:5000/register-evento",
+                "https://grupo7-tpinicial.onrender.com/register-evento",
                 json=checkin_data
             )
             if response.status_code == 200:

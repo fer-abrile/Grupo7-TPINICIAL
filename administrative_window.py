@@ -142,7 +142,7 @@ class AdministrativeWindow(QMainWindow):
         }
         
         try:
-            response = requests.post('http://localhost:5000/register-evento', json=checkout_data)
+            response = requests.post('https://grupo7-tpinicial.onrender.com/register-evento', json=checkout_data)
             if response.status_code == 200:
                 QMessageBox.information(self, "Salida", "CheckOut registrado correctamente.")
                 self.close()
@@ -324,7 +324,7 @@ class EmployeeManagementPanel(QWidget):
             employee_data['EmpleadoID'] = f"TEMP-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
             try:
-                response = requests.post('http://localhost:5000/add-empleado', json=employee_data)
+                response = requests.post('https://grupo7-tpinicial.onrender.com/add-empleado', json=employee_data)
                 if response.status_code == 200:
                     QMessageBox.information(self, "Éxito", "Empleado agregado como temporal correctamente.")
                     self.load_employees()
@@ -353,7 +353,7 @@ class EmployeeManagementPanel(QWidget):
             updated_data['EmpleadoID'] = employee_data['EmpleadoID']  # Mantener el ID original
             
             try:
-                response = requests.put(f'http://localhost:5000/update-empleado/{employee_data["EmpleadoID"]}', json=updated_data)
+                response = requests.put(f'https://grupo7-tpinicial.onrender.com/update-empleado/{employee_data["EmpleadoID"]}', json=updated_data)
                 if response.status_code == 200:
                     QMessageBox.information(self, "Éxito", "Empleado actualizado correctamente.")
                     self.load_employees()
@@ -387,7 +387,7 @@ class EmployeeManagementPanel(QWidget):
         
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                response = requests.delete(f'http://localhost:5000/delete-empleado/{empleado_id}')
+                response = requests.delete(f'https://grupo7-tpinicial.onrender.com/delete-empleado/{empleado_id}')
                 if response.status_code == 200:
                     QMessageBox.information(self, "Éxito", "Empleado eliminado correctamente.")
                     self.load_employees()

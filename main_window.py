@@ -25,6 +25,11 @@ class MainWindow(QMainWindow):
         self.setFixedSize(1200, 800)
         self.setup_ui()
 
+    def realizar_checkout(self):
+        """Cerrar la ventana principal al salir"""
+        QMessageBox.information(self, "Salida", "¡Hasta luego!")
+        self.close()
+
     def setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -496,7 +501,7 @@ class TemporalWindow(QMainWindow):
             "evento": "CheckIn"
         }
         try:
-            response = requests.post('http://localhost:5000/register-evento', json=checkin_data)
+            response = requests.post('https://grupo7-tpinicial.onrender.com/register-evento', json=checkin_data)
             if response.status_code == 200:
                 QMessageBox.information(self, "Check-In", "Check-In registrado correctamente.")
                 self.load_my_attendance()  # Recargar historial
@@ -592,10 +597,18 @@ class TemporalWindow(QMainWindow):
             "evento": "CheckOut"
         }
         try:
-            response = requests.post('http://localhost:5000/register-evento', json=checkout_data)
+            response = requests.post('https://grupo7-tpinicial.onrender.com/register-evento', json=checkout_data)
             if response.status_code == 200:
                 QMessageBox.information(self, "Salida", "Check-Out registrado. ¡Hasta luego!")
             self.close()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al registrar checkout: {str(e)}")
             self.close()
+
+    def cerrar_ventana_actual(self):
+        if self.current_user_window is not None:
+            try:
+                self.current_user_window.close()
+            except RuntimeError:
+                pass  # Window already deleted
+            self.current_user_window = None

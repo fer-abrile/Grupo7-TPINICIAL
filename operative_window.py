@@ -144,7 +144,7 @@ class OperativeWindow(QMainWindow):
         }
         
         try:
-            response = requests.post('http://localhost:5000/register-evento', json=checkout_data)
+            response = requests.post('https://grupo7-tpinicial.onrender.com/register-evento', json=checkout_data)
             if response.status_code == 200:
                 QMessageBox.information(self, "Salida", "CheckOut registrado correctamente.")
                 self.close()
