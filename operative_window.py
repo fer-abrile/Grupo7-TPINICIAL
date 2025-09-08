@@ -450,7 +450,7 @@ class InventoryPanel(QWidget):
         desperdicio_layout = QFormLayout()
         
         self.desperdicio_producto_combo = QComboBox()
-        self.desperdicio_producto_combo.addItems(["Producto A", "Producto B", "Producto C", "Producto D"])
+        self.desperdicio_producto_combo.addItems(["Harina", "Fideos", "Azúcar", "Arroz"])
         
         self.desperdicio_cantidad_spin = QSpinBox()
         self.desperdicio_cantidad_spin.setRange(1, 9999)
@@ -1040,7 +1040,7 @@ class MyAttendancePanel(QWidget):
                 # Llenar tabla de historial
                 self.load_history_table(eventos_por_dia)
                 
-                QMessageBox.information(self, "Actualizado", "Asistencia actualizada desde el servidor.")
+
                         
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error cargando asistencia: {str(e)}")
