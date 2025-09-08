@@ -370,7 +370,7 @@ class LoginWindow(QMainWindow):
         self.login_button.setText("Validando...")
 
         try:
-            response = requests.get('http://localhost:5000/get-empleados')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-empleados')
             if response.status_code != 200:
                 self.show_message("Error al conectar con la API")
                 return
@@ -471,7 +471,7 @@ class LoginWindow(QMainWindow):
 
     def validar_login(self, username, password):
         try:
-            response = requests.get('http://localhost:5000/get-empleados')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-empleados')
             if response.status_code != 200:
                 self.status_label.setText("Error al conectar con la API")
                 return False

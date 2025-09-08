@@ -514,7 +514,7 @@ class TemporalWindow(QMainWindow):
             "evento": "CheckOut"
         }
         try:
-            response = requests.post('http://localhost:5000/register-evento', json=checkout_data)
+            response = requests.post('https://grupo7-tpinicial.onrender.com/register-evento', json=checkout_data)
             if response.status_code == 200:
                 QMessageBox.information(self, "Check-Out", "Check-Out registrado correctamente.")
                 self.load_my_attendance()  # Recargar historial
@@ -527,7 +527,7 @@ class TemporalWindow(QMainWindow):
         """Cargar historial de asistencia personal"""
         try:
             empleado_id = self.usuario_data.get("EmpleadoID")
-            response = requests.get('http://localhost:5000/get-eventos')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-eventos')
             
             if response.status_code == 200:
                 eventos = response.json()

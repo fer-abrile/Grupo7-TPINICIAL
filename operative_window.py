@@ -623,7 +623,7 @@ class InventoryPanel(QWidget):
     def load_inventory_from_api(self):
         """Cargar inventario desde la API (único GET para inventario)"""
         try:
-            response = requests.get('http://localhost:5000/get-productos')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-productos')
             if response.status_code == 200:
                 products = response.json()
                 self.cached_products = products
@@ -1003,7 +1003,7 @@ class MyAttendancePanel(QWidget):
             empleado_id = self.usuario_data.get("EmpleadoID")
             print(f"Cargando asistencia para empleado ID: {empleado_id}")
             
-            response = requests.get('http://localhost:5000/get-eventos')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-eventos')
             if response.status_code == 200:
                 eventos = response.json()
                 self.cached_events = eventos

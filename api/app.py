@@ -6,12 +6,19 @@ from firebase_admin import credentials, firestore
 
 app = Flask(__name__)
 
-# Leer la clave privada desde una variable de entorno
-firebase_key_json = os.environ.get('FIREBASE_KEY_JSON')
-if not firebase_key_json:
-    raise Exception("FIREBASE_KEY_JSON no está definida en las variables de entorno.")
+# Leer la clave privada desde un archivo secreto en Render
+firebase_key_path = '/etc/secrets/firebase_key.json'
+if os.path.exists(firebase_key_path):
+    with open(firebase_key_path) as f:
+        firebase_key_json = json.load(f)
+else:
+    # Fallback: leer desde variable de entorno (útil para desarrollo local)
+    firebase_key_env = os.environ.get('FIREBASE_KEY_JSON')
+    if not firebase_key_env:
+        raise Exception("No se encontró la clave privada de Firebase ni en /etc/secrets/firebase_key.json ni en la variable de entorno FIREBASE_KEY_JSON.")
+    firebase_key_json = json.loads(firebase_key_env)
 
-cred = credentials.Certificate(json.loads(firebase_key_json))
+cred = credentials.Certificate(firebase_key_json)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 

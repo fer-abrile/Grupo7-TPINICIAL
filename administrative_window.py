@@ -289,7 +289,7 @@ class EmployeeManagementPanel(QWidget):
 
     def load_employees(self):
         try:
-            response = requests.get('http://localhost:5000/get-empleados')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-empleados')
             if response.status_code == 200:
                 empleados = response.json()
 
@@ -897,7 +897,7 @@ class AttendanceControlPanel(QWidget):
     def load_attendance(self):
         try:
             # Cargar eventos del día actual
-            response = requests.get('http://localhost:5000/get-eventos')
+            response = requests.get('https://grupo7-tpinicial.onrender.com/get-eventos')
             if response.status_code == 200:
                 eventos = response.json()
                 today = date.today().isoformat()
